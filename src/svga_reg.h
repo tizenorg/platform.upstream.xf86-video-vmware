@@ -9,7 +9,7 @@
  *
  * SVGA hardware definitions
  */
-/* $XFree86$ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/vmware/svga_reg.h,v 1.8 2003/02/04 01:39:53 dawes Exp $ */
 
 #ifndef _SVGA_REG_H_
 #define _SVGA_REG_H_

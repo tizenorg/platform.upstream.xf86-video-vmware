@@ -6,7 +6,7 @@
 char rcsId_vmwarexaa[] =
     "Id: $";
 #endif
-/* $XFree86$ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/vmware/vmwarexaa.c,v 1.6 2003/04/13 18:09:27 dawes Exp $ */
 
 #include "vmware.h"
 
