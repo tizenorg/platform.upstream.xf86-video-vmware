@@ -151,6 +151,7 @@ static const OptionInfoRec VMWAREOptions[] = {
 };
 
 static void VMWAREStopFIFO(ScrnInfoPtr pScrn);
+static void VMWARESave(ScrnInfoPtr pScrn);
 
 static Bool
 VMWAREGetRec(ScrnInfoPtr pScrn)
@@ -435,13 +436,6 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
                "VMware SVGA regs at (0x%04lx, 0x%04lx)\n",
                pVMWARE->indexReg, pVMWARE->valueReg);
 
-    id = VMXGetVMwareSvgaId(pVMWARE);
-    if (id == SVGA_ID_0 || id == SVGA_ID_INVALID) {
-        xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-                   "No supported VMware SVGA found (read ID 0x%08x).\n", id);
-        return FALSE;
-    }
-
     if (!xf86LoadSubModule(pScrn, "vgahw")) {
         return FALSE;
     }
@@ -449,6 +443,19 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     xf86LoaderReqSymLists(vgahwSymbols, NULL);
 
     if (!vgaHWGetHWRec(pScrn)) {
+        return FALSE;
+    }
+
+    /*
+     * Save the current video state.  Do it here before VMXGetVMwareSvgaId
+     * writes to any registers.
+     */
+    VMWARESave(pScrn);
+
+    id = VMXGetVMwareSvgaId(pVMWARE);
+    if (id == SVGA_ID_0 || id == SVGA_ID_INVALID) {
+        xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+                   "No supported VMware SVGA found (read ID 0x%08x).\n", id);
         return FALSE;
     }
 
@@ -1123,9 +1130,6 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
     hwp = VGAHWPTR(pScrn);
     vgaHWGetIOBase(hwp);
-
-    /* Save the current video state */
-    VMWARESave(pScrn);
 
     VMWAREInitFIFO(pScrn);
 
