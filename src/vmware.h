@@ -18,6 +18,7 @@
 #include "xf86PciInfo.h"	/* pci vendor id */
 #include "xf86Pci.h"		/* pci */
 #include "xf86Cursor.h"		/* hw cursor */
+#include "cursorstr.h"          /* xhot/yhot */
 
 #include "vgaHW.h"		/* VGA hardware */
 #include "fb.h"
@@ -46,6 +47,8 @@ typedef struct {
     CARD32 svga_reg_cursor_id;
 
     Bool svga_fifo_enabled;
+
+    CARD32 svga_reg_id;
 } VMWARERegRec, *VMWARERegPtr;
 
 typedef struct {
@@ -99,6 +102,7 @@ typedef struct {
     xf86CursorInfoPtr CursorInfoRec;
     struct {
         int bg, fg, x, y;
+        int hotX, hotY;
         BoxRec box;
 
         uint32 mask[SVGA_BITMAP_SIZE(MAX_CURS, MAX_CURS)];
@@ -180,87 +184,61 @@ extern const char *vmwareXaaSymbols[];
 #define ACCELERATE_OPS
 
 void vmwareWriteReg(
-#if NeedFunctionPrototypes
    VMWAREPtr pVMWARE, int index, CARD32 value
-#endif
    );
 
 CARD32 vmwareReadReg(
-#if NeedFunctionPrototypes
     VMWAREPtr pVMWARE, int index
-#endif
     );
 
 void vmwareWriteWordToFIFO(
-#if NeedFunctionPrototypes
    VMWAREPtr pVMWARE, CARD32 value
-#endif
    );
 
 void vmwareWaitForFB(
-#ifdef NeedFunctionPrototypes
    VMWAREPtr pVMWARE
-#endif
    );
 
 void vmwareSendSVGACmdUpdate(
-#if NeedFunctionPrototypes
    VMWAREPtr pVMWARE, BoxPtr pBB
-#endif
    );
 
 /* vmwarecurs.c */
 Bool vmwareCursorInit(
-#if NeedFunctionPrototypes
    ScreenPtr pScr
-#endif
    );
 
 void vmwareCursorModeInit(
-#if NeedFunctionPrototypes
     ScrnInfoPtr pScrn,
     DisplayModePtr mode
-#endif
    );
 
 void vmwareCursorCloseScreen(
-#if NeedFunctionPrototypes
     ScreenPtr pScr
-#endif
     );
 
 void vmwareWriteCursorRegs(
-#if NeedFunctionPrototypes
    VMWAREPtr pVMWARE,
    Bool visible,
    Bool force
-#endif
    );
 
 void vmwareCursorHookWrappers(
-#if NeedFunctionPrototypes
    ScreenPtr pScreen
-#endif
    );
 
 
 /* vmwarexaa.c */
 Bool vmwareXAAScreenInit(
-#if NeedFunctionPrototypes
    ScreenPtr pScreen
-#endif
    );
 
 Bool vmwareXAAModeInit(
-#if NeedFunctionPrototypes
     ScrnInfoPtr pScrn, DisplayModePtr mode
-#endif
     );
 
 void vmwareXAACloseScreen(
-#if NeedFunctionPrototypes
    ScreenPtr pScreen
-#endif
    );
 
 #endif
