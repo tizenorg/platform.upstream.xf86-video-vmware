@@ -6,7 +6,7 @@
 char rcsId_vmwarexaa[] =
     "Id: $";
 #endif
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/vmware/vmwarexaa.c,v 1.6 2003/04/13 18:09:27 dawes Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/vmware/vmwarexaa.c,v 1.5 2003/02/04 01:39:53 dawes Exp $ */
 
 #include "vmware.h"
 
@@ -445,7 +445,7 @@ vmwareSubsequentColorExpandScanline(ScrnInfoPtr pScrn, int bufno)
 
 static void
 RGBPlusAlphaChannelToPremultipliedRGBA(
-    CARD8 red, CARD8 blue, CARD8 green,
+    CARD8 red, CARD8 green, CARD8 blue,
     CARD8 *alphaPtr,   /* in bytes */
     int alphaPitch,
     CARD32 *dstPtr,
