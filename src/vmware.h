@@ -180,61 +180,87 @@ extern const char *vmwareXaaSymbols[];
 #define ACCELERATE_OPS
 
 void vmwareWriteReg(
+#if NeedFunctionPrototypes
    VMWAREPtr pVMWARE, int index, CARD32 value
+#endif
    );
 
 CARD32 vmwareReadReg(
+#if NeedFunctionPrototypes
     VMWAREPtr pVMWARE, int index
+#endif
     );
 
 void vmwareWriteWordToFIFO(
+#if NeedFunctionPrototypes
    VMWAREPtr pVMWARE, CARD32 value
+#endif
    );
 
 void vmwareWaitForFB(
+#ifdef NeedFunctionPrototypes
    VMWAREPtr pVMWARE
+#endif
    );
 
 void vmwareSendSVGACmdUpdate(
+#if NeedFunctionPrototypes
    VMWAREPtr pVMWARE, BoxPtr pBB
+#endif
    );
 
 /* vmwarecurs.c */
 Bool vmwareCursorInit(
+#if NeedFunctionPrototypes
    ScreenPtr pScr
+#endif
    );
 
 void vmwareCursorModeInit(
+#if NeedFunctionPrototypes
     ScrnInfoPtr pScrn,
     DisplayModePtr mode
+#endif
    );
 
 void vmwareCursorCloseScreen(
+#if NeedFunctionPrototypes
     ScreenPtr pScr
+#endif
     );
 
 void vmwareWriteCursorRegs(
+#if NeedFunctionPrototypes
    VMWAREPtr pVMWARE,
    Bool visible,
    Bool force
+#endif
    );
 
 void vmwareCursorHookWrappers(
+#if NeedFunctionPrototypes
    ScreenPtr pScreen
+#endif
    );
 
 
 /* vmwarexaa.c */
 Bool vmwareXAAScreenInit(
+#if NeedFunctionPrototypes
    ScreenPtr pScreen
+#endif
    );
 
 Bool vmwareXAAModeInit(
+#if NeedFunctionPrototypes
     ScrnInfoPtr pScrn, DisplayModePtr mode
+#endif
     );
 
 void vmwareXAACloseScreen(
+#if NeedFunctionPrototypes
    ScreenPtr pScreen
+#endif
    );
 
 #endif

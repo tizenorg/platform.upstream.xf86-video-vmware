@@ -6,7 +6,7 @@
 char rcsId_vmwarecurs[] =
     "Id: vmwarecurs.c,v 1.5 2001/01/30 23:33:02 bennett Exp $";
 #endif
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/vmware/vmwarecurs.c,v 1.10 2003/02/04 01:39:53 dawes Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/vmware/vmwarecurs.c,v 1.11 2003/02/05 12:47:42 dawes Exp $ */
 
 #include "vmware.h"
 #include "bits2pixels.h"
