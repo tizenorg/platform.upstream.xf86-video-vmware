@@ -1,4 +1,4 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/vmware/svga_limits.h,v 1.2 2002/10/16 22:12:53 alanh Exp $ */
+/* $XFree86$ */
 /* **********************************************************
  * Copyright (C) 1998-2001 VMware, Inc.
  * All Rights Reserved
