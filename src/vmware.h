@@ -18,6 +18,7 @@
 #include "xf86PciInfo.h"	/* pci vendor id */
 #include "xf86Pci.h"		/* pci */
 #include "xf86Cursor.h"		/* hw cursor */
+#include "cursorstr.h"          /* xhot/yhot */
 
 #include "vgaHW.h"		/* VGA hardware */
 #include "fb.h"
@@ -46,6 +47,8 @@ typedef struct {
     CARD32 svga_reg_cursor_id;
 
     Bool svga_fifo_enabled;
+
+    CARD32 svga_reg_id;
 } VMWARERegRec, *VMWARERegPtr;
 
 typedef struct {
@@ -99,6 +102,7 @@ typedef struct {
     xf86CursorInfoPtr CursorInfoRec;
     struct {
         int bg, fg, x, y;
+        int hotX, hotY;
         BoxRec box;
 
         uint32 mask[SVGA_BITMAP_SIZE(MAX_CURS, MAX_CURS)];
