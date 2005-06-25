@@ -1401,7 +1401,7 @@ VMWAREProbe(DriverPtr drv, int flags)
     return foundScreen;
 }
 
-DriverRec VMWARE = {
+_X_EXPORT DriverRec VMWARE = {
     VERSION,
     VMWARE_DRIVER_NAME,
     VMWAREIdentify,
@@ -1414,7 +1414,11 @@ DriverRec VMWARE = {
 #ifdef XFree86LOADER
 static MODULESETUPPROTO(vmwareSetup);
 
-XF86ModuleData vmwareModuleData = { &vmwareVersRec, vmwareSetup, NULL };
+_X_EXPORT XF86ModuleData vmwareModuleData = {
+    &vmwareVersRec,
+    vmwareSetup,
+    NULL
+};
 
 static pointer
 vmwareSetup(pointer module, pointer opts, int *errmaj, int *errmin)
