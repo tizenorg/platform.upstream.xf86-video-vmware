@@ -1084,8 +1084,10 @@ VMWAREPreDirtyBBUpdate(ScrnInfoPtr pScrn, int nboxes, BoxPtr boxPtr)
      */
     while (nboxes--) {
         if (BOX_INTERSECT(*boxPtr, pVMWARE->hwcur.box)) {
-	    PRE_OP_HIDE_CURSOR();
-	    pVMWARE->cursorExcludedForUpdate = TRUE;
+            if (!pVMWARE->cursorExcludedForUpdate) {
+                PRE_OP_HIDE_CURSOR();
+                pVMWARE->cursorExcludedForUpdate = TRUE;
+            }
 	    break;
         }
         boxPtr++;
