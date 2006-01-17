@@ -1,3 +1,11 @@
+2006-01-12  Philip Langdale  <plangdale@vmware.com>
+
+	* configure.ac: Bump version number.
+	* src/vmware.c: Implement the DriverFunc so that we
+	can adjust the guest 'physical' display size to keep
+	DPI constant. Setting the initial display size to
+	match the host continues to be an exercise for the user.
+
 2005-12-20  Kevin E. Martin  <kem-at-freedesktop-dot-org>
 
 	* configure.ac:

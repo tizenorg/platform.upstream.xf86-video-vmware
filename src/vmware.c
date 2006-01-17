@@ -39,6 +39,12 @@ char rcsId_vmware[] =
 #include "guest_os.h"
 #include "vm_device_version.h"
 
+#ifdef HaveDriverFuncs
+#define VMWARE_DRIVER_FUNC HaveDriverFuncs
+#else
+#define VMWARE_DRIVER_FUNC 0
+#endif
+
 /*
  * Sanity check that xf86PciInfo.h has the correct values (which come from
  * the VMware source tree in vm_device_version.h.
@@ -64,8 +70,9 @@ char rcsId_vmware[] =
 #define VMWARE_DRIVER_NAME "vmware"
 #define VMWARE_MAJOR_VERSION	10
 #define VMWARE_MINOR_VERSION	11
-#define VMWARE_PATCHLEVEL	1
-#define VERSION (VMWARE_MAJOR_VERSION * 65536 + VMWARE_MINOR_VERSION * 256 + VMWARE_PATCHLEVEL)
+#define VMWARE_PATCHLEVEL	2
+#define VMWARE_DRIVER_VERSION \
+   (VMWARE_MAJOR_VERSION * 65536 + VMWARE_MINOR_VERSION * 256 + VMWARE_PATCHLEVEL)
 
 static const char VMWAREBuildStr[] = "VMware Guest X Server " 
     VMW_STRING(VMWARE_MAJOR_VERSION) "." VMW_STRING(VMWARE_MINOR_VERSION)
@@ -1044,6 +1051,10 @@ VMWARECloseScreen(int scrnIndex, ScreenPtr pScreen)
     pScreen->CloseScreen = save->CloseScreen;
     pScreen->SaveScreen = save->SaveScreen;
 
+#if VMWARE_DRIVER_FUNC
+    pScrn->DriverFunc = NULL;
+#endif
+
     return (*pScreen->CloseScreen)(scrnIndex, pScreen);
 }
 
@@ -1139,6 +1150,44 @@ VMWARELoadPalette(ScrnInfoPtr pScrn, int numColors, int* indices,
     }
     VmwareLog(("Palette loading done\n"));
 }
+
+#if VMWARE_DRIVER_FUNC
+static Bool
+VMWareDriverFunc(ScrnInfoPtr pScrn,
+                 xorgDriverFuncOp op,
+                 pointer data)
+{
+   CARD32 *flag;
+   xorgRRModeMM *modemm;
+
+   switch (op) {
+   case GET_REQUIRED_HW_INTERFACES:
+      flag = (CARD32 *)data;
+
+      if (flag) {
+         *flag = HW_IO | HW_MMIO;
+      }
+      return TRUE;
+   case RR_GET_MODE_MM:
+      modemm = (xorgRRModeMM *)data;
+
+      /*
+       * Because changing the resolution of the guest is usually changing the size
+       * of a window on the host desktop, the real physical DPI will not change. To
+       * keep the guest in sync, we scale the 'physical' screen dimensions to
+       * keep the DPI constant.
+       */
+      if (modemm && modemm->mode) {
+         modemm->mmWidth *= modemm->mode->HDisplay / (double)(modemm->virtX);
+         modemm->mmHeight *= modemm->mode->VDisplay / (double)(modemm->virtY);
+      }
+      return TRUE;
+   default:
+      return FALSE;
+   }
+}
+#endif
+
 
 static Bool
 VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
@@ -1321,6 +1370,10 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
         return FALSE;
     }
 
+#if VMWARE_DRIVER_FUNC
+    pScrn->DriverFunc = VMWareDriverFunc;
+#endif
+
     /* Report any unused options (only for the first generation) */
     if (serverGeneration == 1) {
         xf86ShowUnusedOptions(pScrn->scrnIndex, pScrn->options);
@@ -1418,7 +1471,7 @@ VMWAREProbe(DriverPtr drv, int flags)
                                             NULL, NULL);
                 if (pScrn) {
                     VmwareLog(("And even configuration suceeded\n"));
-                    pScrn->driverVersion = VERSION;
+                    pScrn->driverVersion = VMWARE_DRIVER_VERSION;
                     pScrn->driverName = VMWARE_DRIVER_NAME;
                     pScrn->name = VMWARE_NAME;
                     pScrn->Probe = VMWAREProbe;
@@ -1438,14 +1491,18 @@ VMWAREProbe(DriverPtr drv, int flags)
     return foundScreen;
 }
 
+
 _X_EXPORT DriverRec VMWARE = {
-    VERSION,
+    VMWARE_DRIVER_VERSION,
     VMWARE_DRIVER_NAME,
     VMWAREIdentify,
     VMWAREProbe,
     VMWAREAvailableOptions,
     NULL,
-    0
+    0,
+#if VMWARE_DRIVER_FUNC
+    VMWareDriverFunc,
+#endif
 };
 
 #ifdef XFree86LOADER
@@ -1464,7 +1521,7 @@ vmwareSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 
     if (!setupDone) {
         setupDone = TRUE;
-        xf86AddDriver(&VMWARE, module, 0);
+        xf86AddDriver(&VMWARE, module, VMWARE_DRIVER_FUNC);
 
         LoaderRefSymLists(vgahwSymbols, fbSymbols, ramdacSymbols,
                           shadowfbSymbols, vmwareXaaSymbols, NULL);
