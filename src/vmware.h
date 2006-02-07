@@ -76,6 +76,10 @@ typedef struct {
     VMWARERegRec SavedReg;
     VMWARERegRec ModeReg;
 
+    DisplayModePtr initialMode;
+    DisplayModePtr dynMode1;
+    DisplayModePtr dynMode2;
+
     Bool* pvtSema;
 
     Bool noAccel;
@@ -241,5 +245,9 @@ Bool vmwareXAAModeInit(
 void vmwareXAACloseScreen(
    ScreenPtr pScreen
    );
+
+/* vmware_ctl.c */
+void VMwareCtrl_ExtInit(ScrnInfoPtr pScrn);
+
 
 #endif

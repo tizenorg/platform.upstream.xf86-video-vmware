@@ -46,6 +46,19 @@ char rcsId_vmware[] =
 #endif
 
 /*
+ * So that the file compiles unmodified when dropped in to a < 6.9 source tree.
+ */
+#ifndef _X_EXPORT
+#define _X_EXPORT
+#endif
+/*
+ * So that the file compiles unmodified when dropped into an xfree source tree.
+ */
+#ifndef XORG_VERSION_CURRENT
+#define XORG_VERSION_CURRENT XF86_VERSION_CURRENT
+#endif
+
+/*
  * Sanity check that xf86PciInfo.h has the correct values (which come from
  * the VMware source tree in vm_device_version.h.
  */
@@ -69,8 +82,8 @@ char rcsId_vmware[] =
 #define VMWARE_NAME "VMWARE"
 #define VMWARE_DRIVER_NAME "vmware"
 #define VMWARE_MAJOR_VERSION	10
-#define VMWARE_MINOR_VERSION	11
-#define VMWARE_PATCHLEVEL	2
+#define VMWARE_MINOR_VERSION	12
+#define VMWARE_PATCHLEVEL	0
 #define VMWARE_DRIVER_VERSION \
    (VMWARE_MAJOR_VERSION * 65536 + VMWARE_MINOR_VERSION * 256 + VMWARE_PATCHLEVEL)
 
@@ -1151,6 +1164,33 @@ VMWARELoadPalette(ScrnInfoPtr pScrn, int numColors, int* indices,
     VmwareLog(("Palette loading done\n"));
 }
 
+
+static DisplayModeRec *
+VMWAREAddDisplayMode(ScrnInfoPtr pScrn,
+                     const char *name,
+                     int width,
+                     int height)
+{
+   DisplayModeRec *mode;
+
+   mode = xalloc(sizeof(DisplayModeRec));
+
+   mode->name = xalloc(strlen(name) + 1);
+   strcpy(mode->name, name);
+   mode->status = MODE_OK;
+   mode->type = M_T_DEFAULT;
+   mode->HDisplay = width;
+   mode->VDisplay = height;
+
+   mode->next = pScrn->modes;
+   mode->prev = pScrn->modes->prev;
+   pScrn->modes->prev->next = mode;
+   pScrn->modes->prev = mode;
+
+   return mode;
+}
+
+
 #if VMWARE_DRIVER_FUNC
 static Bool
 VMWareDriverFunc(ScrnInfoPtr pScrn,
@@ -1369,6 +1409,16 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
                              CMAP_RELOAD_ON_MODE_SWITCH)) {
         return FALSE;
     }
+
+    /*
+     * The initial mode that fixes the framebuffer is the current mode
+     * at ScreenInit time.
+     */
+    pVMWARE->initialMode = pScrn->currentMode;
+    pVMWARE->dynMode1 = VMWAREAddDisplayMode(pScrn, "DynMode1", 1, 1);
+    pVMWARE->dynMode2 = VMWAREAddDisplayMode(pScrn, "DynMode2", 2, 2);
+       
+    VMwareCtrl_ExtInit(pScrn);
 
 #if VMWARE_DRIVER_FUNC
     pScrn->DriverFunc = VMWareDriverFunc;
