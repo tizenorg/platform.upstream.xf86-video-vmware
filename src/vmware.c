@@ -18,7 +18,6 @@ char rcsId_vmware[] =
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
-#include "xf86_ansic.h"
 #include "xf86Resources.h"
 
 #include "compiler.h"	/* inb/outb */
@@ -82,7 +81,7 @@ char rcsId_vmware[] =
 #define VMWARE_NAME "VMWARE"
 #define VMWARE_DRIVER_NAME "vmware"
 #define VMWARE_MAJOR_VERSION	10
-#define VMWARE_MINOR_VERSION	12
+#define VMWARE_MINOR_VERSION	13
 #define VMWARE_PATCHLEVEL	0
 #define VMWARE_DRIVER_VERSION \
    (VMWARE_MAJOR_VERSION * 65536 + VMWARE_MINOR_VERSION * 256 + VMWARE_PATCHLEVEL)
