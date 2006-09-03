@@ -1164,7 +1164,7 @@ VMWARELoadPalette(ScrnInfoPtr pScrn, int numColors, int* indices,
 }
 
 
-static DisplayModeRec *
+DisplayModeRec *
 VMWAREAddDisplayMode(ScrnInfoPtr pScrn,
                      const char *name,
                      int width,
@@ -1414,8 +1414,13 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
      * at ScreenInit time.
      */
     pVMWARE->initialMode = pScrn->currentMode;
-    pVMWARE->dynMode1 = VMWAREAddDisplayMode(pScrn, "DynMode1", 1, 1);
-    pVMWARE->dynMode2 = VMWAREAddDisplayMode(pScrn, "DynMode2", 2, 2);
+
+    /*
+     * We will lazily add the dynamic modes as the are needed when new
+     * modes are requested through the control extension.
+     */
+    pVMWARE->dynMode1 = NULL;
+    pVMWARE->dynMode2 = NULL;
        
     VMwareCtrl_ExtInit(pScrn);
 

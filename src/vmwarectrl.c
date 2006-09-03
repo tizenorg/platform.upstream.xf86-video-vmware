@@ -134,6 +134,13 @@ VMwareCtrlDoSetRes(ScrnInfoPtr pScrn,
       mode = pVMWARE->dynMode1;
       pVMWARE->dynMode1 = pVMWARE->dynMode2;
       pVMWARE->dynMode2 = mode;
+
+      /*
+       * Initialise the dynamic mode if it hasn't been used before.
+       */
+      if (!pVMWARE->dynMode1) {
+         pVMWARE->dynMode1 = VMWAREAddDisplayMode(pScrn, "DynMode", 1, 1);
+      }
       mode = pVMWARE->dynMode1;
 
       mode->HDisplay = x;

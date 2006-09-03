@@ -209,6 +209,13 @@ void vmwareSendSVGACmdUpdate(
    VMWAREPtr pVMWARE, BoxPtr pBB
    );
 
+DisplayModeRec *VMWAREAddDisplayMode(
+    ScrnInfoPtr pScrn,
+    const char *name,
+    int width,
+    int height
+   );
+
 /* vmwarecurs.c */
 Bool vmwareCursorInit(
    ScreenPtr pScr
