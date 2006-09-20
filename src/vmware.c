@@ -277,12 +277,18 @@ vmwareSendSVGACmdUpdateFullScreen(VMWAREPtr pVMWARE)
 }
 
 static void
-vmwareSendSVGACmdPitchLock(VMWAREPtr pVMWARE, unsigned long fbPitch)
+vmwareSetPitchLock(VMWAREPtr pVMWARE, unsigned long fbPitch)
 {
    CARD32 *vmwareFIFO = pVMWARE->vmwareFIFO;
 
-   if (pVMWARE->canPitchLock && vmwareFIFO[SVGA_FIFO_MIN] >=
-                                (vmwareReadReg(pVMWARE, SVGA_REG_MEM_REGS) << 2)) {
+   VmwareLog(("Attempting to set pitchlock\n"));
+
+   if (pVMWARE->vmwareCapability & SVGA_CAP_PITCHLOCK) {
+      VmwareLog(("Using PitchLock register\n"));
+      vmwareWriteReg(pVMWARE, SVGA_REG_PITCHLOCK, fbPitch);
+   } else if (pVMWARE->hasPitchLockFIFOReg &&
+              vmwareFIFO[SVGA_FIFO_MIN] >= (vmwareReadReg(pVMWARE, SVGA_REG_MEM_REGS) << 2)) {
+      VmwareLog(("Using PitchLock FIFO register\n"));
       vmwareFIFO[SVGA_FIFO_PITCHLOCK] = fbPitch;
    }
 }
@@ -1019,7 +1025,7 @@ VMWAREInitFIFO(ScrnInfoPtr pScrn)
     vmwareFIFO[SVGA_FIFO_STOP] = min * sizeof(CARD32);
     vmwareWriteReg(pVMWARE, SVGA_REG_CONFIG_DONE, 1);
 
-    pVMWARE->canPitchLock =
+    pVMWARE->hasPitchLockFIFOReg =
         extendedFifo && (vmwareFIFO[SVGA_FIFO_CAPABILITIES] & SVGA_FIFO_CAP_PITCHLOCK);
 }
 
@@ -1052,7 +1058,7 @@ VMWARECloseScreen(int scrnIndex, ScreenPtr pScreen)
             vmwareXAACloseScreen(pScreen);
         }
 
-        vmwareSendSVGACmdPitchLock(pVMWARE, 0);
+        vmwareSetPitchLock(pVMWARE, 0);
 
         VMWARERestore(pScrn);
         VMWAREUnmapMem(pScrn);
@@ -1252,7 +1258,7 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     /* Initialise the first mode */
     VMWAREModeInit(pScrn, pScrn->currentMode);
 
-    vmwareSendSVGACmdPitchLock(pVMWARE, pVMWARE->fbPitch);
+    vmwareSetPitchLock(pVMWARE, pVMWARE->fbPitch);
 
     /* Set the viewport if supported */
     VMWAREAdjustFrame(scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
@@ -1453,7 +1459,7 @@ VMWAREEnterVT(int scrnIndex, int flags)
         VMWAREInitFIFO(pScrn);
     }
 
-    vmwareSendSVGACmdPitchLock(pVMWARE, pVMWARE->fbPitch);
+    vmwareSetPitchLock(pVMWARE, pVMWARE->fbPitch);
 
     return VMWAREModeInit(pScrn, pScrn->currentMode);
 }
@@ -1464,7 +1470,7 @@ VMWARELeaveVT(int scrnIndex, int flags)
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
 
-    vmwareSendSVGACmdPitchLock(pVMWARE, 0);
+    vmwareSetPitchLock(pVMWARE, 0);
 
     VMWARERestore(pScrn);
 }
