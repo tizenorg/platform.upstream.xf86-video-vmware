@@ -752,11 +752,12 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     /*
      * Init xinerama preferences.
      */
-    useXinerama = xf86ReturnOptValBool(options, OPTION_XINERAMA, TRUE);
+    useXinerama = xf86ReturnOptValBool(options, OPTION_XINERAMA,
+                                       pVMWARE->vmwareCapability & SVGA_CAP_MULTIMON);
     if (useXinerama && !(pVMWARE->vmwareCapability & SVGA_CAP_MULTIMON)) {
-       useXinerama = FALSE;
-       xf86DrvMsg(pScrn->scrnIndex, X_WARNING, "Xinerama is not not supported by "
-                                               "the current virtual hardware\n");
+       xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+                  "Xinerama is not safely supported by the current virtual hardware. "
+                  "Do not request resolutions that require > 16MB of framebuffer.\n");
     }
     pVMWARE->xineramaStatic = xf86ReturnOptValBool(options, OPTION_STATIC_XINERAMA, FALSE);
 
