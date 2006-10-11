@@ -1,0 +1,8 @@
+2006-10-11  Philip Langdale  <plangdale@vmware.com>
+
+	* 0.2 Release.
+	Adds support for VMWARE_CTRL 0.2
+
+2006-02-07  Philip Langdale  <plangdale@vmware.com>
+
+	* Initial 0.1 Release.

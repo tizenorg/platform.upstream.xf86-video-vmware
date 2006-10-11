@@ -1,0 +1,6 @@
+vmwarectrl
+----------
+
+This is a sample VMWARE_CTRL client. Someone interested in using
+VMWARE_CTRL should use libvmwarectrl.[c|h] from this directory
+and the main vmwarectrl.h and vmwarectrlproto.h
