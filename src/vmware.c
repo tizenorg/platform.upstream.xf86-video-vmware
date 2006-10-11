@@ -82,7 +82,7 @@ char rcsId_vmware[] =
 #define VMWARE_DRIVER_NAME "vmware"
 #define VMWARE_MAJOR_VERSION	10
 #define VMWARE_MINOR_VERSION	13
-#define VMWARE_PATCHLEVEL	0
+#define VMWARE_PATCHLEVEL	99
 #define VMWARE_DRIVER_VERSION \
    (VMWARE_MAJOR_VERSION * 65536 + VMWARE_MINOR_VERSION * 256 + VMWARE_PATCHLEVEL)
 
@@ -164,12 +164,16 @@ static XF86ModuleVersionInfo vmwareVersRec = {
 
 typedef enum {
     OPTION_HW_CURSOR,
-    OPTION_NOACCEL
+    OPTION_NOACCEL,
+    OPTION_XINERAMA,
+    OPTION_STATIC_XINERAMA,
 } VMWAREOpts;
 
 static const OptionInfoRec VMWAREOptions[] = {
     { OPTION_HW_CURSOR, "HWcursor",     OPTV_BOOLEAN,   {0},    FALSE },
     { OPTION_NOACCEL,   "NoAccel",      OPTV_BOOLEAN,   {0},    FALSE },
+    { OPTION_XINERAMA,  "Xinerama",     OPTV_BOOLEAN,   {0},    FALSE },
+    { OPTION_STATIC_XINERAMA, "StaticXinerama", OPTV_BOOLEAN, {0}, FALSE },
     { -1,               NULL,           OPTV_NONE,      {0},    FALSE }
 };
 
@@ -431,6 +435,7 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     int i;
     ClockRange* clockRanges;
     IOADDRESS domainIOBase = 0;
+    Bool useXinerama = TRUE;
 
 #ifndef BUILD_FOR_420
     domainIOBase = pScrn->domainIOBase;
@@ -743,6 +748,18 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     }
     pScrn->videoRam = pVMWARE->videoRam / 1024;
     pScrn->memPhysBase = pVMWARE->memPhysBase;
+
+    /*
+     * Init xinerama preferences.
+     */
+    useXinerama = xf86ReturnOptValBool(options, OPTION_XINERAMA, TRUE);
+    if (useXinerama && !(pVMWARE->vmwareCapability & SVGA_CAP_MULTIMON)) {
+       useXinerama = FALSE;
+       xf86DrvMsg(pScrn->scrnIndex, X_WARNING, "Xinerama is not not supported by "
+                                               "the current virtual hardware\n");
+    }
+    pVMWARE->xineramaStatic = xf86ReturnOptValBool(options, OPTION_STATIC_XINERAMA, FALSE);
+
     xfree(options);
 
     {
@@ -813,6 +830,30 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
             return FALSE;
         }
         xf86LoaderReqSymLists(vmwareXaaSymbols, NULL);
+    }
+
+    /* Initialise VMWARE_CTRL extension. */
+    VMwareCtrl_ExtInit(pScrn);
+
+    /* Initialise Xinerama extension. */
+    if (useXinerama) {
+       VMwareXinerama_ExtInit(pScrn);
+    }
+
+    if (pVMWARE->xinerama && pVMWARE->xineramaStatic) {
+#if 0
+      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Setting up static Xinerama topology.\n");
+      pVMWARE->xineramaState = (VMWAREXineramaPtr)xcalloc(pVMWARE->xineramaNumOutputs,
+                                                          sizeof (VMWAREXineramaRec));
+      if (!pVMWARE->xineramaState) {
+         xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+                    "Failed to initialize VMware Xinerama state.\n");
+      } else {
+         /* XXX: Apply static xinerama topology from config file. */
+      }
+#else
+      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "\"StaticXinerama\" is not supported yet.\n");
+#endif
     }
 
     return TRUE;
@@ -987,6 +1028,33 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
         if (!vmwareXAAModeInit(pScrn, mode)) {
             return FALSE;
         }
+    }
+
+    /*
+     * Update Xinerama info appropriately.
+     */
+    if (pVMWARE->xinerama && !pVMWARE->xineramaStatic) {
+       if (pVMWARE->xineramaNextState) {
+          Xfree(pVMWARE->xineramaState);
+          pVMWARE->xineramaState = pVMWARE->xineramaNextState;
+          pVMWARE->xineramaNumOutputs = pVMWARE->xineramaNextNumOutputs;
+
+          pVMWARE->xineramaNextState = NULL;
+          pVMWARE->xineramaNextNumOutputs = 0;
+       } else {
+          VMWAREXineramaPtr basicState =
+             (VMWAREXineramaPtr)xcalloc(1, sizeof (VMWAREXineramaRec));
+          if (basicState) {
+             basicState->x_org = 0;
+             basicState->y_org = 0;
+             basicState->width = vmwareReg->svga_reg_width;
+             basicState->height = vmwareReg->svga_reg_height;
+
+             Xfree(pVMWARE->xineramaState);
+             pVMWARE->xineramaState = basicState;
+             pVMWARE->xineramaNumOutputs = 1;
+          }
+       }
     }
 
     return TRUE;
@@ -1427,8 +1495,6 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
      */
     pVMWARE->dynMode1 = NULL;
     pVMWARE->dynMode2 = NULL;
-       
-    VMwareCtrl_ExtInit(pScrn);
 
 #if VMWARE_DRIVER_FUNC
     pScrn->DriverFunc = VMWareDriverFunc;
