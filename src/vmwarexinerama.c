@@ -631,7 +631,7 @@ VMwareXineramaResetProc(ExtensionEntry* extEntry)
    VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
 
    if (pVMWARE->xineramaState) {
-      Xfree(pVMWARE->xineramaState);
+      xfree(pVMWARE->xineramaState);
       pVMWARE->xineramaState = NULL;
       pVMWARE->xineramaNumOutputs = 0;
       pVMWARE->xinerama = FALSE;

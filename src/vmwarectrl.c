@@ -254,7 +254,7 @@ VMwareCtrlDoSetTopology(ScrnInfoPtr pScrn,
       if (xineramaState) {
          memcpy(xineramaState, extents, number * sizeof (VMWAREXineramaRec));
 
-         Xfree(pVMWARE->xineramaNextState);
+         xfree(pVMWARE->xineramaNextState);
          pVMWARE->xineramaNextState = xineramaState;
          pVMWARE->xineramaNextNumOutputs = number;
 

@@ -173,7 +173,7 @@ static const OptionInfoRec VMWAREOptions[] = {
     { OPTION_HW_CURSOR, "HWcursor",     OPTV_BOOLEAN,   {0},    FALSE },
     { OPTION_NOACCEL,   "NoAccel",      OPTV_BOOLEAN,   {0},    FALSE },
     { OPTION_XINERAMA,  "Xinerama",     OPTV_BOOLEAN,   {0},    FALSE },
-    { OPTION_STATIC_XINERAMA, "StaticXinerama", OPTV_BOOLEAN, {0}, FALSE },
+    { OPTION_STATIC_XINERAMA, "StaticXinerama", OPTV_STRING, {0}, FALSE },
     { -1,               NULL,           OPTV_NONE,      {0},    FALSE }
 };
 
@@ -423,6 +423,127 @@ VMWAREAvailableOptions(int chipid, int busid)
 {
     return VMWAREOptions;
 }
+
+static xXineramaScreenInfo *
+VMWAREParseTopologyString(ScrnInfoPtr pScrn,
+                          const char *topology,     // IN:
+                          unsigned int *retNumOutputs) // OUT:
+{
+   xXineramaScreenInfo *extents = NULL;
+   unsigned int numOutputs = 0;
+   const char *str = topology;
+
+   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Starting...\n");
+
+   do {
+      char buf[10];
+      unsigned long x, y, width, height;
+      size_t i = 0;
+
+      for (i = 0; str[i] >= '0' && str[i] <= '9'; i++);
+      if (i == 0) {
+        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: unable to parse width.\n",
+                   numOutputs);
+        goto error;
+      }
+
+      strncpy(buf, str, i);
+      width = atoi(buf);
+
+      if (str[i] != 'x' && str[i] != 'X') {
+         xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+                    "Output %u: unexpected character '%c' after width.\n",
+                    numOutputs, str[i]);
+         goto error;
+      }
+
+      str += (i + 1);
+
+      for (i = 0; str[i] >= '0' && str[i] <= '9'; i++);
+      if (i == 0) {
+        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: unable to parse height.\n",
+                   numOutputs);
+        goto error;
+      }
+
+      strncpy(buf, str, i);
+      height = atoi(buf);
+
+      if (str[i] != '+') {
+         xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+                    "Output %u: unexpected character '%c' after height.\n",
+                    numOutputs, str[i]);
+         goto error;
+      }
+
+      str += (i + 1);
+
+      for (i = 0; str[i] >= '0' && str[i] <= '9'; i++);
+      if (i == 0) {
+        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: unable to parse X offset.\n",
+                   numOutputs);
+        goto error;
+      }
+
+      strncpy(buf, str, i);
+      x = atoi(buf);
+
+      if (str[i] != '+') {
+         xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+                    "Output %u: unexpected character '%c' after X offset.\n",
+                    numOutputs, str[i]);
+         goto error;
+      }
+
+      str += (i + 1);
+
+      for (i = 0; str[i] >= '0' && str[i] <= '9'; i++);
+      if (i == 0) {
+        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: unable to parse Y offset.\n",
+                   numOutputs);
+        goto error;
+      }
+
+      strncpy(buf, str, i);
+      y = atoi(buf);
+
+      if (str[i] == '\0') {
+         str += i;
+      } else if (str[i] != ';') {
+         xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+                    "Output %u: unexpected character '%c' after Y offset.\n",
+                    numOutputs, str[i]);
+         goto error;
+      } else {
+         str += (i + 1);
+      }
+
+      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: %hux%hu+%hu+%hu\n",
+                 numOutputs, width, height, x, y);
+
+      numOutputs++;
+      extents = xrealloc(extents, numOutputs * sizeof (xXineramaScreenInfo));
+      extents[numOutputs - 1].x_org = x;
+      extents[numOutputs - 1].y_org = y;
+      extents[numOutputs - 1].width = width;
+      extents[numOutputs - 1].height = height;
+   } while (*str != 0);
+
+   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Succeeded.\n");
+   goto exit;
+
+ error:
+   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Failed.\n");
+
+   xfree(extents);
+   extents = NULL;
+   numOutputs = 0;
+
+ exit:
+   *retNumOutputs = numOutputs;
+   return extents;
+}
+
 
 static Bool
 VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
@@ -759,7 +880,19 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
                   "Xinerama is not safely supported by the current virtual hardware. "
                   "Do not request resolutions that require > 16MB of framebuffer.\n");
     }
-    pVMWARE->xineramaStatic = xf86ReturnOptValBool(options, OPTION_STATIC_XINERAMA, FALSE);
+
+
+    if (useXinerama && xf86IsOptionSet(options, OPTION_STATIC_XINERAMA)) {
+       char *topology = xf86GetOptValString(options, OPTION_STATIC_XINERAMA);
+       if (topology) {
+          pVMWARE->xineramaState =
+             VMWAREParseTopologyString(pScrn, topology, &pVMWARE->xineramaNumOutputs);
+
+         pVMWARE->xineramaStatic = pVMWARE->xineramaState != NULL;
+
+         xfree(topology);
+       }
+    }
 
     xfree(options);
 
@@ -842,19 +975,9 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     }
 
     if (pVMWARE->xinerama && pVMWARE->xineramaStatic) {
-#if 0
-      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Setting up static Xinerama topology.\n");
-      pVMWARE->xineramaState = (VMWAREXineramaPtr)xcalloc(pVMWARE->xineramaNumOutputs,
-                                                          sizeof (VMWAREXineramaRec));
-      if (!pVMWARE->xineramaState) {
-         xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-                    "Failed to initialize VMware Xinerama state.\n");
-      } else {
-         /* XXX: Apply static xinerama topology from config file. */
-      }
-#else
-      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "\"StaticXinerama\" is not supported yet.\n");
-#endif
+       xf86DrvMsg(pScrn->scrnIndex, X_INFO, pVMWARE->xineramaState ?
+                                            "Using static Xinerama.\n" :
+                                            "Failed to configure static Xinerama.\n");
     }
 
     return TRUE;
@@ -1036,7 +1159,7 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
      */
     if (pVMWARE->xinerama && !pVMWARE->xineramaStatic) {
        if (pVMWARE->xineramaNextState) {
-          Xfree(pVMWARE->xineramaState);
+          xfree(pVMWARE->xineramaState);
           pVMWARE->xineramaState = pVMWARE->xineramaNextState;
           pVMWARE->xineramaNumOutputs = pVMWARE->xineramaNextNumOutputs;
 
@@ -1051,7 +1174,7 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
              basicState->width = vmwareReg->svga_reg_width;
              basicState->height = vmwareReg->svga_reg_height;
 
-             Xfree(pVMWARE->xineramaState);
+             xfree(pVMWARE->xineramaState);
              pVMWARE->xineramaState = basicState;
              pVMWARE->xineramaNumOutputs = 1;
           }
