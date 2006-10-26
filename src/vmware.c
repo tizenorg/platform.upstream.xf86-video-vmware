@@ -424,6 +424,57 @@ VMWAREAvailableOptions(int chipid, int busid)
     return VMWAREOptions;
 }
 
+static int
+VMWAREParseTopologyElement(ScrnInfoPtr pScrn,
+                           unsigned int output,
+                           const char *elementName,
+                           const char *element,
+                           const char *expectedTerminators,
+                           Bool needTerminator,
+                           unsigned long *outValue)
+{
+   char buf[10];
+   size_t i = 0;
+   int retVal = -1;
+   const char *str = element;
+
+   for (i = 0; str[i] >= '0' && str[i] <= '9'; i++);
+   if (i == 0) {
+      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: unable to parse %s.\n",
+                 output, elementName);
+      goto exit;
+   }
+
+   strncpy(buf, str, i);
+   *outValue = atoi(buf);
+
+   str += i;
+
+   if (needTerminator || str[0] != '\0') {
+      Bool unexpected = TRUE;
+
+      for (i = 0; i < strlen(expectedTerminators); i++) {
+         if (str[0] == expectedTerminators[i]) {
+            unexpected = FALSE;
+         }
+      }
+
+      if (unexpected) {
+         xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+                    "Output %u: unexpected character '%c' after %s.\n",
+                    output, str[0], elementName);
+         goto exit;
+      } else {
+         str++;
+      }
+   }
+
+   retVal = str - element;
+
+ exit:
+   return retVal;
+}
+
 static xXineramaScreenInfo *
 VMWAREParseTopologyString(ScrnInfoPtr pScrn,
                           const char *topology,     // IN:
@@ -438,85 +489,31 @@ VMWAREParseTopologyString(ScrnInfoPtr pScrn,
    do {
       char buf[10];
       unsigned long x, y, width, height;
-      size_t i = 0;
+      int i;
 
-      for (i = 0; str[i] >= '0' && str[i] <= '9'; i++);
-      if (i == 0) {
-        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: unable to parse width.\n",
-                   numOutputs);
-        goto error;
-      }
-
-      strncpy(buf, str, i);
-      width = atoi(buf);
-
-      if (str[i] != 'x' && str[i] != 'X') {
-         xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-                    "Output %u: unexpected character '%c' after width.\n",
-                    numOutputs, str[i]);
+      i = VMWAREParseTopologyElement(pScrn, numOutputs, "width", str, "xX", TRUE, &width);
+      if (i == -1) {
          goto error;
       }
+      str += i;
 
-      str += (i + 1);
-
-      for (i = 0; str[i] >= '0' && str[i] <= '9'; i++);
-      if (i == 0) {
-        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: unable to parse height.\n",
-                   numOutputs);
-        goto error;
-      }
-
-      strncpy(buf, str, i);
-      height = atoi(buf);
-
-      if (str[i] != '+') {
-         xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-                    "Output %u: unexpected character '%c' after height.\n",
-                    numOutputs, str[i]);
+      i = VMWAREParseTopologyElement(pScrn, numOutputs, "height", str, "+", TRUE, &height);
+      if (i == -1) {
          goto error;
       }
+      str += i;
 
-      str += (i + 1);
-
-      for (i = 0; str[i] >= '0' && str[i] <= '9'; i++);
-      if (i == 0) {
-        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: unable to parse X offset.\n",
-                   numOutputs);
-        goto error;
-      }
-
-      strncpy(buf, str, i);
-      x = atoi(buf);
-
-      if (str[i] != '+') {
-         xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-                    "Output %u: unexpected character '%c' after X offset.\n",
-                    numOutputs, str[i]);
+      i= VMWAREParseTopologyElement(pScrn, numOutputs, "X offset", str, "+", TRUE, &x);
+      if (i == -1) {
          goto error;
       }
+      str += i;
 
-      str += (i + 1);
-
-      for (i = 0; str[i] >= '0' && str[i] <= '9'; i++);
-      if (i == 0) {
-        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: unable to parse Y offset.\n",
-                   numOutputs);
-        goto error;
-      }
-
-      strncpy(buf, str, i);
-      y = atoi(buf);
-
-      if (str[i] == '\0') {
-         str += i;
-      } else if (str[i] != ';') {
-         xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-                    "Output %u: unexpected character '%c' after Y offset.\n",
-                    numOutputs, str[i]);
+      i = VMWAREParseTopologyElement(pScrn, numOutputs, "Y offset", str, ";", FALSE, &y);
+      if (i == -1) {
          goto error;
-      } else {
-         str += (i + 1);
       }
+      str += i;
 
       xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: %hux%hu+%hu+%hu\n",
                  numOutputs, width, height, x, y);
