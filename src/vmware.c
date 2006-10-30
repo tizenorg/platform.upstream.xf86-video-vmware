@@ -166,7 +166,7 @@ typedef enum {
     OPTION_HW_CURSOR,
     OPTION_NOACCEL,
     OPTION_XINERAMA,
-    OPTION_STATIC_XINERAMA,
+    OPTION_STATIC_XINERAMA
 } VMWAREOpts;
 
 static const OptionInfoRec VMWAREOptions[] = {
@@ -448,6 +448,12 @@ VMWAREParseTopologyElement(ScrnInfoPtr pScrn,
    strncpy(buf, str, i);
    *outValue = atoi(buf);
 
+   if (*outValue > (unsigned short)-1) {
+      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: %s must be less than %hu.\n",
+                 output, elementName, (unsigned short)-1);
+      goto exit;
+   }
+
    str += i;
 
    if (needTerminator || str[0] != '\0') {
@@ -477,8 +483,8 @@ VMWAREParseTopologyElement(ScrnInfoPtr pScrn,
 
 static xXineramaScreenInfo *
 VMWAREParseTopologyString(ScrnInfoPtr pScrn,
-                          const char *topology,     // IN:
-                          unsigned int *retNumOutputs) // OUT:
+                          const char *topology,
+                          unsigned int *retNumOutputs)
 {
    xXineramaScreenInfo *extents = NULL;
    unsigned int numOutputs = 0;
@@ -515,7 +521,7 @@ VMWAREParseTopologyString(ScrnInfoPtr pScrn,
       }
       str += i;
 
-      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: %hux%hu+%hu+%hu\n",
+      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: %ux%u+%u+%u\n",
                  numOutputs, width, height, x, y);
 
       numOutputs++;
