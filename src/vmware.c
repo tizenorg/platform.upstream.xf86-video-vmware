@@ -431,7 +431,7 @@ VMWAREParseTopologyElement(ScrnInfoPtr pScrn,
                            const char *element,
                            const char *expectedTerminators,
                            Bool needTerminator,
-                           unsigned long *outValue)
+                           unsigned int *outValue)
 {
    char buf[10];
    size_t i = 0;
@@ -493,8 +493,7 @@ VMWAREParseTopologyString(ScrnInfoPtr pScrn,
    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Starting...\n");
 
    do {
-      char buf[10];
-      unsigned long x, y, width, height;
+      unsigned int x, y, width, height;
       int i;
 
       i = VMWAREParseTopologyElement(pScrn, numOutputs, "width", str, "xX", TRUE, &width);
