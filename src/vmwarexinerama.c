@@ -115,9 +115,8 @@ VMwareXineramaGetState(ClientPtr client)
     VMWAREPtr pVMWARE;
 
     REQUEST_SIZE_MATCH(xPanoramiXGetStateReq);
-    n = dixLookupWindow(&pWin, stuff->window, client, DixUnknownAccess);
-    if (n != Success)
-	return n;
+    pWin = LookupWindow(stuff->window, client);
+    if(!pWin) return BadWindow;
 
     if (!(ext = CheckExtension(PANORAMIX_PROTOCOL_NAME))) {
        return BadMatch;
@@ -168,9 +167,8 @@ VMwareXineramaGetScreenCount(ClientPtr client)
     VMWAREPtr pVMWARE;
 
     REQUEST_SIZE_MATCH(xPanoramiXGetScreenCountReq);
-    n = dixLookupWindow(&pWin, stuff->window, client, DixUnknownAccess);
-    if (n != Success)
-	return n;
+    pWin = LookupWindow(stuff->window, client);
+    if(!pWin) return BadWindow;
 
     if (!(ext = CheckExtension(PANORAMIX_PROTOCOL_NAME))) {
        return BadMatch;
@@ -221,9 +219,8 @@ VMwareXineramaGetScreenSize(ClientPtr client)
     VMWAREPtr pVMWARE;
 
     REQUEST_SIZE_MATCH(xPanoramiXGetScreenSizeReq);
-    n = dixLookupWindow(&pWin, stuff->window, client, DixUnknownAccess);
-    if (n != Success)
-	return n;
+    pWin = LookupWindow (stuff->window, client);
+    if(!pWin)  return BadWindow;
 
     if (!(ext = CheckExtension(PANORAMIX_PROTOCOL_NAME))) {
        return BadMatch;
