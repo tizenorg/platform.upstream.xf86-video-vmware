@@ -164,14 +164,12 @@ static XF86ModuleVersionInfo vmwareVersRec = {
 
 typedef enum {
     OPTION_HW_CURSOR,
-    OPTION_NOACCEL,
     OPTION_XINERAMA,
     OPTION_STATIC_XINERAMA
 } VMWAREOpts;
 
 static const OptionInfoRec VMWAREOptions[] = {
     { OPTION_HW_CURSOR, "HWcursor",     OPTV_BOOLEAN,   {0},    FALSE },
-    { OPTION_NOACCEL,   "NoAccel",      OPTV_BOOLEAN,   {0},    FALSE },
     { OPTION_XINERAMA,  "Xinerama",     OPTV_BOOLEAN,   {0},    FALSE },
     { OPTION_STATIC_XINERAMA, "StaticXinerama", OPTV_STRING, {0}, FALSE },
     { -1,               NULL,           OPTV_NONE,      {0},    FALSE }
@@ -846,12 +844,6 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     }
     xf86DrvMsg(pScrn->scrnIndex, from, "Using %s cursor\n",
                pVMWARE->hwCursor ? "HW" : "SW");
-    if (xf86IsOptionSet(options, OPTION_NOACCEL)) {
-        pVMWARE->noAccel = TRUE;
-        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Acceleration disabled\n");
-    } else {
-        pVMWARE->noAccel = FALSE;
-    }
     pScrn->videoRam = pVMWARE->videoRam / 1024;
     pScrn->memPhysBase = pVMWARE->memPhysBase;
 
@@ -941,14 +933,6 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
             return FALSE;
         }
         xf86LoaderReqSymLists(ramdacSymbols, NULL);
-    }
-
-    if (!pVMWARE->noAccel) {
-        if (!xf86LoadSubModule(pScrn, "xaa")) {
-            VMWAREFreeRec(pScrn);
-            return FALSE;
-        }
-        xf86LoaderReqSymLists(vmwareXaaSymbols, NULL);
     }
 
     /* Initialise VMWARE_CTRL extension. */
@@ -1145,15 +1129,6 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool rebuildPixmap)
      */
 
     /*
-     * Let XAA know about the mode change.
-     */
-    if (!pVMWARE->noAccel) {
-        if (!vmwareXAAModeInit(pScrn, mode)) {
-            return FALSE;
-        }
-    }
-
-    /*
      * Update Xinerama info appropriately.
      */
     if (pVMWARE->xinerama && !pVMWARE->xineramaStatic) {
@@ -1240,10 +1215,6 @@ VMWARECloseScreen(int scrnIndex, ScreenPtr pScreen)
     if (*pVMWARE->pvtSema) {
         if (pVMWARE->CursorInfoRec) {
             vmwareCursorCloseScreen(pScreen);
-        }
-
-        if (pVMWARE->xaaInfo) {
-            vmwareXAACloseScreen(pScreen);
         }
 
         VMWARERestore(pScrn);
@@ -1550,17 +1521,6 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     }
 
     /*
-     * Initialize acceleration.
-     */
-    if (!pVMWARE->noAccel) {
-        if (!vmwareXAAScreenInit(pScreen)) {
-            xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-                       "XAA initialization failed -- running unaccelerated!\n");
-            pVMWARE->noAccel = TRUE;
-        }
-    }
-
-    /*
      * If backing store is to be supported (as is usually the case),
      * initialise it.
      */
@@ -1756,7 +1716,7 @@ vmwareSetup(pointer module, pointer opts, int *errmaj, int *errmin)
         xf86AddDriver(&VMWARE, module, VMWARE_DRIVER_FUNC);
 
         LoaderRefSymLists(vgahwSymbols, fbSymbols, ramdacSymbols,
-                          shadowfbSymbols, vmwareXaaSymbols, NULL);
+                          shadowfbSymbols, NULL);
 
         return (pointer)1;
     }

@@ -25,15 +25,12 @@
 
 #include "vgaHW.h"		/* VGA hardware */
 #include "fb.h"
-#include "xaa.h"
 
 #include "xf86cmap.h"		/* xf86HandleColormaps */
 
 #include "vm_basic_types.h"
 #include "svga_reg.h"
 #include "svga_struct.h"
-
-#include "offscreen_manager.h"
 
 /* Arbitrarily choose max cursor dimensions.  The emulation doesn't care. */
 #define MAX_CURS        32
@@ -124,23 +121,6 @@ typedef struct {
     ScreenRec ScrnFuncs;
 
     /*
-     * XAA info rec and misc storage
-     */
-    XAAInfoRecPtr xaaInfo;
-    int xaaFGColor;
-    int xaaBGColor;
-    int xaaRop;
-
-    unsigned char* xaaColorExpScanLine[1];
-    unsigned int xaaColorExpSize; /* size of current scan line in DWords */
-
-    Heap* heap;
-    SVGASurface* frontBuffer;
-
-    SVGASurface* curPict;
-    int op;
-
-    /*
      * Xinerama state
      */
     Bool xinerama;
@@ -188,8 +168,6 @@ static __inline ScrnInfoPtr infoFromScreen(ScreenPtr s) {
     }
 
 #define MOUSE_ID 1
-
-extern const char *vmwareXaaSymbols[];
 
 /*#define DEBUG_LOGGING*/
 #ifdef DEBUG_LOGGING
@@ -254,19 +232,6 @@ void vmwareCursorHookWrappers(
    ScreenPtr pScreen
    );
 
-
-/* vmwarexaa.c */
-Bool vmwareXAAScreenInit(
-   ScreenPtr pScreen
-   );
-
-Bool vmwareXAAModeInit(
-    ScrnInfoPtr pScrn, DisplayModePtr mode
-    );
-
-void vmwareXAACloseScreen(
-   ScreenPtr pScreen
-   );
 
 /* vmwarectrl.c */
 void VMwareCtrl_ExtInit(ScrnInfoPtr pScrn);
