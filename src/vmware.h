@@ -81,7 +81,6 @@ typedef struct {
     VMWARERegRec SavedReg;
     VMWARERegRec ModeReg;
 
-    DisplayModePtr initialMode;
     DisplayModePtr dynMode1;
     DisplayModePtr dynMode2;
 
@@ -107,7 +106,6 @@ typedef struct {
 
     unsigned char* mmioVirtBase;
     CARD32* vmwareFIFO;
-    Bool hasPitchLockFIFOReg;
 
     xf86CursorInfoPtr CursorInfoRec;
     struct {

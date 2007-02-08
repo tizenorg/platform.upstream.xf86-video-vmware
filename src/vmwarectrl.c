@@ -113,18 +113,27 @@ VMwareCtrlQueryVersion(ClientPtr client)
 static Bool
 VMwareCtrlDoSetRes(ScrnInfoPtr pScrn,
                    CARD32 x,
-                   CARD32 y)
+                   CARD32 y,
+                   Bool resetXinerama)
 {
    DisplayModePtr mode;
    VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
-  
+
    if (pScrn && pScrn->modes) {
+      VmwareLog(("DoSetRes: %d %d\n", x, y));
+  
+      if (resetXinerama) {
+         xfree(pVMWARE->xineramaNextState);
+         pVMWARE->xineramaNextState = NULL;
+         pVMWARE->xineramaNextNumOutputs = 0;
+      }
+
       /* 
        * Don't resize larger than possible but don't
        * return an X Error either.
        */
-      if (x > pVMWARE->initialMode->HDisplay ||
-          y > pVMWARE->initialMode->VDisplay) {
+      if (x > pVMWARE->maxWidth ||
+          y > pVMWARE->maxHeight) {
          return TRUE;
       }
 
@@ -191,7 +200,7 @@ VMwareCtrlSetRes(ClientPtr client)
       return BadMatch;
    }
 
-   if (!VMwareCtrlDoSetRes(pScrn, stuff->x, stuff->y)) {
+   if (!VMwareCtrlDoSetRes(pScrn, stuff->x, stuff->y, TRUE)) {
       return BadValue;
    }
 
@@ -250,6 +259,8 @@ VMwareCtrlDoSetTopology(ScrnInfoPtr pScrn,
          maxY = MAX(maxY, extents[i].y_org + extents[i].height);
       }
 
+      VmwareLog(("DoSetTopology: %d %d\n", maxX, maxY));
+
       xineramaState = (VMWAREXineramaPtr)xcalloc(number, sizeof(VMWAREXineramaRec));
       if (xineramaState) {
          memcpy(xineramaState, extents, number * sizeof (VMWAREXineramaRec));
@@ -258,7 +269,7 @@ VMwareCtrlDoSetTopology(ScrnInfoPtr pScrn,
          pVMWARE->xineramaNextState = xineramaState;
          pVMWARE->xineramaNextNumOutputs = number;
 
-         return VMwareCtrlDoSetRes(pScrn, maxX, maxY);
+         return VMwareCtrlDoSetRes(pScrn, maxX, maxY, FALSE);
       } else {
          return FALSE;
       }

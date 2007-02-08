@@ -280,23 +280,6 @@ vmwareSendSVGACmdUpdateFullScreen(VMWAREPtr pVMWARE)
     vmwareSendSVGACmdUpdate(pVMWARE, &BB);
 }
 
-static void
-vmwareSetPitchLock(VMWAREPtr pVMWARE, unsigned long fbPitch)
-{
-   CARD32 *vmwareFIFO = pVMWARE->vmwareFIFO;
-
-   VmwareLog(("Attempting to set pitchlock\n"));
-
-   if (pVMWARE->vmwareCapability & SVGA_CAP_PITCHLOCK) {
-      VmwareLog(("Using PitchLock register\n"));
-      vmwareWriteReg(pVMWARE, SVGA_REG_PITCHLOCK, fbPitch);
-   } else if (pVMWARE->hasPitchLockFIFOReg &&
-              vmwareFIFO[SVGA_FIFO_MIN] >= (vmwareReadReg(pVMWARE, SVGA_REG_MEM_REGS) << 2)) {
-      VmwareLog(("Using PitchLock FIFO register\n"));
-      vmwareFIFO[SVGA_FIFO_PITCHLOCK] = fbPitch;
-   }
-}
-
 static CARD32
 vmwareCalculateWeight(CARD32 mask)
 {
@@ -1101,7 +1084,7 @@ VMWARERestore(ScrnInfoPtr pScrn)
 }
 
 static Bool
-VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool rebuildPixmap)
 {
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     vgaRegPtr vgaReg = &hwp->ModeReg;
@@ -1139,6 +1122,20 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     VmwareLog(("fbPitch:       %u\n", pVMWARE->fbPitch));
     VmwareLog(("fbSize:        %u\n", pVMWARE->FbSize));
     VmwareLog(("New dispWidth: %u\n", pScrn->displayWidth));
+
+    if (rebuildPixmap) {
+        pScrn->pScreen->ModifyPixmapHeader((*pScrn->pScreen->GetScreenPixmap)(pScrn->pScreen),
+                                           pScrn->pScreen->width,
+                                           pScrn->pScreen->height,
+                                           pScrn->pScreen->rootDepth,
+                                           pScrn->bitsPerPixel,
+                                           PixmapBytePad(pScrn->displayWidth,
+                                                         pScrn->pScreen->rootDepth),
+                                           (pointer)(pVMWARE->FbBase + pScrn->fbOffset));
+
+        (*pScrn->EnableDisableFBAccess)(pScrn->pScreen->myNum, FALSE);
+        (*pScrn->EnableDisableFBAccess)(pScrn->pScreen->myNum, TRUE);
+    }
 
     vgaHWProtect(pScrn, FALSE);
 
@@ -1218,9 +1215,6 @@ VMWAREInitFIFO(ScrnInfoPtr pScrn)
     vmwareFIFO[SVGA_FIFO_NEXT_CMD] = min * sizeof(CARD32);
     vmwareFIFO[SVGA_FIFO_STOP] = min * sizeof(CARD32);
     vmwareWriteReg(pVMWARE, SVGA_REG_CONFIG_DONE, 1);
-
-    pVMWARE->hasPitchLockFIFOReg =
-        extendedFifo && (vmwareFIFO[SVGA_FIFO_CAPABILITIES] & SVGA_FIFO_CAP_PITCHLOCK);
 }
 
 static void
@@ -1251,8 +1245,6 @@ VMWARECloseScreen(int scrnIndex, ScreenPtr pScreen)
         if (pVMWARE->xaaInfo) {
             vmwareXAACloseScreen(pScreen);
         }
-
-        vmwareSetPitchLock(pVMWARE, 0);
 
         VMWARERestore(pScrn);
         VMWAREUnmapMem(pScrn);
@@ -1450,9 +1442,7 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     VMWAREInitFIFO(pScrn);
 
     /* Initialise the first mode */
-    VMWAREModeInit(pScrn, pScrn->currentMode);
-
-    vmwareSetPitchLock(pVMWARE, pVMWARE->fbPitch);
+    VMWAREModeInit(pScrn, pScrn->currentMode, FALSE);
 
     /* Set the viewport if supported */
     VMWAREAdjustFrame(scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
@@ -1610,12 +1600,6 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     }
 
     /*
-     * The initial mode that fixes the framebuffer is the current mode
-     * at ScreenInit time.
-     */
-    pVMWARE->initialMode = pScrn->currentMode;
-
-    /*
      * We will lazily add the dynamic modes as the are needed when new
      * modes are requested through the control extension.
      */
@@ -1638,7 +1622,7 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 static Bool
 VMWARESwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
 {
-    return VMWAREModeInit(xf86Screens[scrnIndex], mode);
+    return VMWAREModeInit(xf86Screens[scrnIndex], mode, TRUE);
 }
 
 static Bool
@@ -1651,9 +1635,7 @@ VMWAREEnterVT(int scrnIndex, int flags)
         VMWAREInitFIFO(pScrn);
     }
 
-    vmwareSetPitchLock(pVMWARE, pVMWARE->fbPitch);
-
-    return VMWAREModeInit(pScrn, pScrn->currentMode);
+    return VMWAREModeInit(pScrn, pScrn->currentMode, TRUE);
 }
 
 static void
@@ -1661,8 +1643,6 @@ VMWARELeaveVT(int scrnIndex, int flags)
 {
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
-
-    vmwareSetPitchLock(pVMWARE, 0);
 
     VMWARERestore(pScrn);
 }
