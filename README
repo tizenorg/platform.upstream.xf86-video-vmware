@@ -20,6 +20,9 @@ svga_limits.h
     Included by svga_reg.h, defines maximum frame buffer and memory region
     sizes.
 
+svga_modes.h
+    A list of default display modes that are built into the driver.
+
 guest_os.h
     Values for the GUEST_ID register.
 
@@ -29,6 +32,9 @@ vm_basic_types.h
 vm_device_version.h
     PCI vendor ID's and related information.
 
+vmwarectrl.h
+vmwarectrlproto.h
+    The definitions of the VMWARECTRL protocol extension.
 
 Programming the VMware SVGA Device
 ----------------------------------
