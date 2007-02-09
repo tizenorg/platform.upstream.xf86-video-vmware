@@ -34,6 +34,7 @@ vmware_drv_la_SOURCES = \
          guest_os.h \
          includeCheck.h \
          svga_limits.h \
+         svga_modes.h \
          svga_reg.h \
          svga_struct.h \
          vm_basic_types.h \
