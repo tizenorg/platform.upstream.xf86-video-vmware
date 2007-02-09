@@ -37,6 +37,7 @@ char rcsId_vmware[] =
 #include "vmware.h"
 #include "guest_os.h"
 #include "vm_device_version.h"
+#include "svga_modes.h"
 
 #ifdef HaveDriverFuncs
 #define VMWARE_DRIVER_FUNC HaveDriverFuncs
@@ -174,6 +175,21 @@ static const OptionInfoRec VMWAREOptions[] = {
     { OPTION_STATIC_XINERAMA, "StaticXinerama", OPTV_STRING, {0}, FALSE },
     { -1,               NULL,           OPTV_NONE,      {0},    FALSE }
 };
+
+/* Table of default modes to always add to the mode list. */
+
+typedef struct {
+   int width;
+   int height;
+} VMWAREDefaultMode;
+
+#define SVGA_DEFAULT_MODE(width, height) { width, height, },
+
+static const VMWAREDefaultMode VMWAREDefaultModes[] = {
+   SVGA_DEFAULT_MODES
+};
+
+#undef SVGA_DEFAULT_MODE
 
 static void VMWAREStopFIFO(ScrnInfoPtr pScrn);
 static void VMWARESave(ScrnInfoPtr pScrn);
@@ -1558,6 +1574,22 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
                              CMAP_RELOAD_ON_MODE_SWITCH)) {
         return FALSE;
     }
+
+    /*
+     * We explictly add a set of default modes because the X server will
+     * not include modes larger than the initial one.
+     */
+   {
+      unsigned int i;
+      unsigned int numModes = sizeof (VMWAREDefaultModes) / sizeof *(VMWAREDefaultModes);
+      char name[10];
+      for (i = 0; i < numModes; i++) {
+         snprintf(name, 10, "%dx%d",
+                  VMWAREDefaultModes[i].width, VMWAREDefaultModes[i].height);
+         VMWAREAddDisplayMode(pScrn, name, VMWAREDefaultModes[i].width,
+                              VMWAREDefaultModes[i].height);
+      }
+   }
 
     /*
      * We will lazily add the dynamic modes as the are needed when new
