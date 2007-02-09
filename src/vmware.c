@@ -1584,11 +1584,18 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
       unsigned int numModes = sizeof (VMWAREDefaultModes) / sizeof *(VMWAREDefaultModes);
       char name[10];
       for (i = 0; i < numModes; i++) {
-         snprintf(name, 10, "%dx%d",
-                  VMWAREDefaultModes[i].width, VMWAREDefaultModes[i].height);
-         VMWAREAddDisplayMode(pScrn, name, VMWAREDefaultModes[i].width,
-                              VMWAREDefaultModes[i].height);
+         const VMWAREDefaultMode *mode = &VMWAREDefaultModes[i];
+
+         /* Only modes that fit the hardware maximums should be added. */
+         if (mode->width <= pVMWARE->maxWidth && mode->height <= pVMWARE->maxHeight) {
+            snprintf(name, 10, "%dx%d", mode->width, mode->height);
+            VMWAREAddDisplayMode(pScrn, name, mode->width, mode->height);
+         }
       }
+
+      /* Add the hardware maximums as a mode. */
+      snprintf(name, 10, "%dx%d", pVMWARE->maxWidth, pVMWARE->maxHeight);
+      VMWAREAddDisplayMode(pScrn, name, pVMWARE->maxWidth, pVMWARE->maxHeight);
    }
 
     /*
