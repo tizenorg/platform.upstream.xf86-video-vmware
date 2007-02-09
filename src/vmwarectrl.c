@@ -229,7 +229,8 @@ VMwareCtrlSetRes(ClientPtr client)
  * VMwareCtrlDoSetTopology --
  *
  *      Set the custom topology and set a dynamic mode to the bounding box
- *      of the passed topology.
+ *      of the passed topology. If a topology is already pending, then do
+ *      nothing but do not return failure.
  *
  * Results:
  *      TRUE on success, FALSE otherwise.
@@ -253,6 +254,11 @@ VMwareCtrlDoSetTopology(ScrnInfoPtr pScrn,
       short maxX = 0;
       short maxY = 0;
       size_t i;
+
+      if (pVMWARE->xineramaNextState) {
+         VmwareLog(("DoSetTopology: Aborting due to existing pending state\n"));
+         return TRUE;
+      }
 
       for (i = 0; i < number; i++) {
          maxX = MAX(maxX, extents[i].x_org + extents[i].width);
