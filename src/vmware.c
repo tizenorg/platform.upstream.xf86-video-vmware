@@ -83,13 +83,23 @@ char rcsId_vmware[] =
 #define VMWARE_DRIVER_NAME "vmware"
 #define VMWARE_MAJOR_VERSION	10
 #define VMWARE_MINOR_VERSION	15
-#define VMWARE_PATCHLEVEL	0
+#define VMWARE_PATCHLEVEL	1
 #define VMWARE_DRIVER_VERSION \
    (VMWARE_MAJOR_VERSION * 65536 + VMWARE_MINOR_VERSION * 256 + VMWARE_PATCHLEVEL)
+#define VMWARE_DRIVER_VERSION_STRING \
+    VMW_STRING(VMWARE_MAJOR_VERSION) "." VMW_STRING(VMWARE_MINOR_VERSION) \
+    "." VMW_STRING(VMWARE_PATCHLEVEL)
 
-static const char VMWAREBuildStr[] = "VMware Guest X Server " 
-    VMW_STRING(VMWARE_MAJOR_VERSION) "." VMW_STRING(VMWARE_MINOR_VERSION)
-    "." VMW_STRING(VMWARE_PATCHLEVEL) " - build=$Name$\n";
+static const char VMWAREBuildStr[] = "VMware Guest X Server "
+    VMWARE_DRIVER_VERSION_STRING " - build=$Name$\n";
+
+/*
+ * Standard four digit version string expected by VMware Tools installer.
+ * As the driver's version is only  {major, minor, patchlevel}, simply append an
+ * extra zero for the fourth digit.
+ */
+const char vm_version[] __attribute__((section(".modinfo"),unused)) =
+    "version=" VMWARE_DRIVER_VERSION_STRING ".0";
 
 static SymTabRec VMWAREChipsets[] = {
     { PCI_CHIP_VMWARE0405, "vmware0405" },
