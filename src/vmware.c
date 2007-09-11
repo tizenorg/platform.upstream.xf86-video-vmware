@@ -98,8 +98,10 @@ static const char VMWAREBuildStr[] = "VMware Guest X Server "
  * As the driver's version is only  {major, minor, patchlevel}, simply append an
  * extra zero for the fourth digit.
  */
+#ifdef __GNUC__
 const char vm_version[] __attribute__((section(".modinfo"),unused)) =
     "version=" VMWARE_DRIVER_VERSION_STRING ".0";
+#endif
 
 static SymTabRec VMWAREChipsets[] = {
     { PCI_CHIP_VMWARE0405, "vmware0405" },
