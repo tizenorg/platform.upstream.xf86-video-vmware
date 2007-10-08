@@ -16,6 +16,11 @@
 
 #include <X11/extensions/panoramiXproto.h>
 
+#include "xorg-server.h"
+#ifdef XSERVER_LIBPCIACCESS
+#include <pciaccess.h>
+#endif
+
 #include "compiler.h"	        /* inb/outb */
 
 #include "xf86PciInfo.h"	/* pci vendor id */
@@ -55,8 +60,12 @@ typedef xXineramaScreenInfo VMWAREXineramaRec, *VMWAREXineramaPtr;
 
 typedef struct {
     EntityInfoPtr pEnt;
+#if XSERVER_LIBPCIACCESS
+    struct pci_device *PciInfo;
+#else
     pciVideoPtr PciInfo;
     PCITAG PciTag;
+#endif
     Bool Primary;
     int depth;
     int bitsPerPixel;
@@ -68,6 +77,7 @@ typedef struct {
     unsigned long fbOffset;
     unsigned long fbPitch;
     unsigned long ioBase;
+    unsigned long portIOBase;
     int maxWidth;
     int maxHeight;
     unsigned int vmwareCapability;
@@ -180,6 +190,20 @@ static __inline ScrnInfoPtr infoFromScreen(ScreenPtr s) {
 
 /* Undefine this to kill all acceleration */
 #define ACCELERATE_OPS
+
+#if XSERVER_LIBPCIACCESS
+#define VENDOR_ID(p)      (p)->vendor_id
+#define DEVICE_ID(p)      (p)->device_id
+#define SUBVENDOR_ID(p)   (p)->subvendor_id
+#define SUBSYS_ID(p)      (p)->subdevice_id
+#define CHIP_REVISION(p)  (p)->revision
+#else
+#define VENDOR_ID(p)      (p)->vendor
+#define DEVICE_ID(p)      (p)->chipType
+#define SUBVENDOR_ID(p)   (p)->subsysVendor
+#define SUBSYS_ID(p)      (p)->subsysCard
+#define CHIP_REVISION(p)  (p)->chipRev
+#endif
 
 void vmwareWriteReg(
    VMWAREPtr pVMWARE, int index, CARD32 value
