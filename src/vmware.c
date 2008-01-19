@@ -1046,7 +1046,11 @@ VMWAREUnmapMem(ScrnInfoPtr pScrn)
 
     VmwareLog(("Unmapped: %p/%u\n", pVMWARE->FbBase, pVMWARE->videoRam));
 
+#if XSERVER_LIBPCIACCESS
+    pci_device_unmap_range(pVMWARE->PciInfo, pVMWARE->FbBase, pVMWARE->videoRam);
+#else
     xf86UnMapVidMem(pScrn->scrnIndex, pVMWARE->FbBase, pVMWARE->videoRam);
+#endif
     pVMWARE->FbBase = NULL;
     return TRUE;
 }
