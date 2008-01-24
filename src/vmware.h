@@ -142,6 +142,11 @@ typedef struct {
     VMWAREXineramaPtr xineramaNextState;
     unsigned int xineramaNextNumOutputs;
 
+    /*
+     * Xv
+     */
+    DevUnion *videoStreams;
+
 } VMWARERec, *VMWAREPtr;
 
 #define VMWAREPTR(p) ((VMWAREPtr)((p)->driverPrivate))
@@ -262,5 +267,20 @@ void VMwareCtrl_ExtInit(ScrnInfoPtr pScrn);
 
 /* vmwarexinerama.c */
 void VMwareXinerama_ExtInit(ScrnInfoPtr pScrn);
+
+/* vmwarevideo.c */
+Bool vmwareInitVideo(
+   ScreenPtr pScreen
+   );
+void vmwareVideoEnd(
+   ScreenPtr pScreen
+   );
+Bool vmwareVideoEnabled(
+   VMWAREPtr pVMWARE
+   );
+
+void vmwareCheckVideoSanity(
+   ScrnInfoPtr pScrn
+   );
 
 #endif

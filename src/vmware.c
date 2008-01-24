@@ -1176,6 +1176,8 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool rebuildPixmap)
     VmwareLog(("fbSize:        %u\n", pVMWARE->FbSize));
     VmwareLog(("New dispWidth: %u\n", pScrn->displayWidth));
 
+    vmwareCheckVideoSanity(pScrn);
+
     if (rebuildPixmap) {
         pScrn->pScreen->ModifyPixmapHeader((*pScrn->pScreen->GetScreenPixmap)(pScrn->pScreen),
                                            pScrn->pScreen->width,
@@ -1303,6 +1305,10 @@ VMWARECloseScreen(int scrnIndex, ScreenPtr pScreen)
     VmwareLog(("cursorSema: %d\n", pVMWARE->cursorSema));
 
     if (*pVMWARE->pvtSema) {
+        if (pVMWARE->videoStreams) {
+            vmwareVideoEnd(pScreen);
+        }
+
         if (pVMWARE->CursorInfoRec) {
             vmwareCursorCloseScreen(pScreen);
         }
@@ -1687,6 +1693,15 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     if (serverGeneration == 1) {
         xf86ShowUnusedOptions(pScrn->scrnIndex, pScrn->options);
     }
+
+    /* Initialize Xv extension */
+    pVMWARE->videoStreams = NULL;
+    if (vmwareVideoEnabled(pVMWARE)) {
+        if (!vmwareVideoInit(pScreen)) {
+            xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Xv initialization failed\n");
+        }
+    }
+
 
     /* Done */
     return TRUE;
