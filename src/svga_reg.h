@@ -576,10 +576,14 @@ enum {
    SVGA_VIDEO_FORMAT,
    SVGA_VIDEO_COLORKEY,
    SVGA_VIDEO_SIZE,
-   SVGA_VIDEO_X,
-   SVGA_VIDEO_Y,
+   SVGA_VIDEO_WIDTH,
+   SVGA_VIDEO_HEIGHT,
+   SVGA_VIDEO_SRC_X,
+   SVGA_VIDEO_SRC_Y,
    SVGA_VIDEO_SRC_WIDTH,
    SVGA_VIDEO_SRC_HEIGHT,
+   SVGA_VIDEO_DST_X,
+   SVGA_VIDEO_DST_Y,
    SVGA_VIDEO_DST_WIDTH,
    SVGA_VIDEO_DST_HEIGHT,
    SVGA_VIDEO_PITCH_1,
@@ -591,19 +595,27 @@ enum {
 
 /*
  * SVGA Overlay Units
+ *
+ *      width and height relate to the entire source video frame.
+ *      srcX, srcY, srcWidth and srcHeight represent subset of the source
+ *      video frame to be displayed.
  */
 
 typedef struct SVGAOverlayUnit {
    uint32 enabled;
    uint32 flags;
-   uint32 dataOffset; 
+   uint32 dataOffset;
    uint32 format;
    uint32 colorKey;
    uint32 size;
-   uint32 x;
-   uint32 y;
+   uint32 width;
+   uint32 height;
+   uint32 srcX;
+   uint32 srcY;
    uint32 srcWidth;
    uint32 srcHeight;
+   uint32 dstX;
+   uint32 dstY;
    uint32 dstWidth;
    uint32 dstHeight;
    uint32 pitches[3];
@@ -779,7 +791,7 @@ typedef struct SVGAOverlayUnit {
 
 #define SVGA_CMD_VIDEO_PLAY_OBSOLETE      31
          /* Obsolete; do not use. */
-
+ 
 #define SVGA_CMD_VIDEO_END_OBSOLETE       32
          /* Obsolete; do not use. */
 

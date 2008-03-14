@@ -749,6 +749,7 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
     };
 
     struct _cmdSetRegs cmdSetRegs;
+    struct _item *items;
 
     memcpy(pVid->bufs[pVid->currBuf].data, buf, pVid->size);
 
@@ -758,26 +759,31 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
     cmdSetRegs.body.escape = SVGA_ESCAPE_VMWARE_VIDEO_SET_REGS;
     cmdSetRegs.body.streamId = pVid->streamId;
 
+    items = cmdSetRegs.body.items;
     for (i = SVGA_VIDEO_ENABLED; i < SVGA_VIDEO_NUM_REGS; i++) {
-        cmdSetRegs.body.items[i].regId = i;
+        items[i].regId = i;
     }
 
-    cmdSetRegs.body.items[SVGA_VIDEO_ENABLED].value = TRUE;
-    cmdSetRegs.body.items[SVGA_VIDEO_DATA_OFFSET].value =
+    items[SVGA_VIDEO_ENABLED].value = TRUE;
+    items[SVGA_VIDEO_DATA_OFFSET].value =
         pVid->bufs[pVid->currBuf].dataOffset;
-    cmdSetRegs.body.items[SVGA_VIDEO_SIZE].value = pVid->size;
-    cmdSetRegs.body.items[SVGA_VIDEO_FORMAT].value = format;
-    cmdSetRegs.body.items[SVGA_VIDEO_X].value = drw_x;
-    cmdSetRegs.body.items[SVGA_VIDEO_Y].value = drw_y;
-    cmdSetRegs.body.items[SVGA_VIDEO_SRC_WIDTH].value = width;
-    cmdSetRegs.body.items[SVGA_VIDEO_SRC_HEIGHT].value = height;
-    cmdSetRegs.body.items[SVGA_VIDEO_DST_WIDTH]. value = drw_w;
-    cmdSetRegs.body.items[SVGA_VIDEO_DST_HEIGHT].value = drw_h;
-    cmdSetRegs.body.items[SVGA_VIDEO_COLORKEY].value = pVid->colorKey;
-    cmdSetRegs.body.items[SVGA_VIDEO_FLAGS].value = pVid->flags;
+    items[SVGA_VIDEO_SIZE].value = pVid->size;
+    items[SVGA_VIDEO_FORMAT].value = format;
+    items[SVGA_VIDEO_WIDTH].value = width;
+    items[SVGA_VIDEO_HEIGHT].value = height;
+    items[SVGA_VIDEO_SRC_X].value = src_x;
+    items[SVGA_VIDEO_SRC_Y].value = src_y;
+    items[SVGA_VIDEO_SRC_WIDTH].value = src_w;
+    items[SVGA_VIDEO_SRC_HEIGHT].value = src_h;
+    items[SVGA_VIDEO_DST_X].value = drw_x;
+    items[SVGA_VIDEO_DST_Y].value = drw_y;
+    items[SVGA_VIDEO_DST_WIDTH]. value = drw_w;
+    items[SVGA_VIDEO_DST_HEIGHT].value = drw_h;
+    items[SVGA_VIDEO_COLORKEY].value = pVid->colorKey;
+    items[SVGA_VIDEO_FLAGS].value = pVid->flags;
 
     for (i = 0, regId = SVGA_VIDEO_PITCH_1; i < 3; i++, regId++) {
-        cmdSetRegs.body.items[regId].value = pVid->fmt_priv->pitches[i];
+        items[regId].value = pVid->fmt_priv->pitches[i];
     }
 
     fifoItem = (uint32 *) &cmdSetRegs;
@@ -950,10 +956,6 @@ static void vmwareVideoEndStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid)
  *
  *    If sync is TRUE the driver should not return from this
  *    function until it is through reading the data from buf.
- *
- *    XXX: src_x, src_y, src_w and src_h are used to denote that only
- *    part of the source image is to be displayed. We ignore as didn't
- *    find applications that use them.
  *
  *    There are two function prototypes to cope with the API change in X.org
  *    7.1
