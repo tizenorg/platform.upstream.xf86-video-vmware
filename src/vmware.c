@@ -1226,6 +1226,42 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool rebuildPixmap)
        }
     }
 
+    /*
+     * Update host's view of guest topology.
+     */
+    if (pVMWARE->vmwareCapability & SVGA_CAP_DISPLAY_TOPOLOGY) {
+        if (pVMWARE->xinerama) {
+            int i = 0;
+            VMWAREXineramaPtr xineramaState = pVMWARE->xineramaState;
+            vmwareWriteReg(pVMWARE, SVGA_REG_NUM_GUEST_DISPLAYS,
+                           pVMWARE->xineramaNumOutputs);
+
+            for (i = 0; i < pVMWARE->xineramaNumOutputs; i++) {
+                vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_ID, i);
+                vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_IS_PRIMARY, TRUE);
+                vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_POSITION_X,
+                               xineramaState[i].x_org);
+                vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_POSITION_Y,
+                               xineramaState[i].y_org);
+                vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_WIDTH,
+                               xineramaState[i].width);
+                vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_HEIGHT,
+                               xineramaState[i].height);
+            }
+        } else {
+            vmwareWriteReg(pVMWARE, SVGA_REG_NUM_GUEST_DISPLAYS, 1);
+
+            vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_ID, 0);
+            vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_IS_PRIMARY, TRUE);
+            vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_POSITION_X, 0);
+            vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_POSITION_Y, 0);
+            vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_WIDTH, mode->HDisplay);
+            vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_HEIGHT, mode->VDisplay);
+        }
+
+        vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_ID, SVGA_INVALID_DISPLAY_ID);
+    }
+
     return TRUE;
 }
 

@@ -138,12 +138,19 @@ enum {
    SVGA_REG_NUM_DISPLAYS = 31,     /* Number of guest displays */
    SVGA_REG_PITCHLOCK = 32,        /* Fixed pitch for all modes */
    SVGA_REG_IRQMASK = 33,          /* Interrupt mask */
-   SVGA_REG_TOP = 34,		   /* Must be 1 more than the last register */
+   SVGA_REG_NUM_GUEST_DISPLAYS = 34,/* Number of guest displays in X/Y direction */
+   SVGA_REG_DISPLAY_ID = 35,        /* The display ID for the following display attributes */
+   SVGA_REG_DISPLAY_IS_PRIMARY = 36,/* Whether this is a primary display */
+   SVGA_REG_DISPLAY_POSITION_X = 37,/* The display position x */
+   SVGA_REG_DISPLAY_POSITION_Y = 38,/* The display position y */
+   SVGA_REG_DISPLAY_WIDTH = 39,     /* The display's width */
+   SVGA_REG_DISPLAY_HEIGHT = 40,    /* The display's height */
+   SVGA_REG_TOP = 41,               /* Must be 1 more than the last register */
 
-   SVGA_PALETTE_BASE = 1024,	   /* Base of SVGA color map */
+   SVGA_PALETTE_BASE = 1024,	    /* Base of SVGA color map */
    /* Next 768 (== 256*3) registers exist for colormap */
    SVGA_SCRATCH_BASE = SVGA_PALETTE_BASE + SVGA_NUM_PALETTE_REGS
-                                   /* Base of scratch registers */
+                                    /* Base of scratch registers */
    /* Next reg[SVGA_REG_SCRATCH_SIZE] registers exist for scratch usage:
       First 4 are reserved for VESA BIOS Extension; any remaining are for
       the use of the current SVGA driver. */
@@ -154,26 +161,28 @@ enum {
  *  Capabilities
  */
 
-#define	SVGA_CAP_NONE               0x00000
-#define	SVGA_CAP_RECT_FILL	    0x00001
-#define	SVGA_CAP_RECT_COPY	    0x00002
-#define	SVGA_CAP_RECT_PAT_FILL      0x00004
-#define	SVGA_CAP_LEGACY_OFFSCREEN   0x00008
-#define	SVGA_CAP_RASTER_OP	    0x00010
-#define	SVGA_CAP_CURSOR		    0x00020
-#define	SVGA_CAP_CURSOR_BYPASS	    0x00040
-#define	SVGA_CAP_CURSOR_BYPASS_2    0x00080
-#define	SVGA_CAP_8BIT_EMULATION     0x00100
-#define SVGA_CAP_ALPHA_CURSOR       0x00200
-#define SVGA_CAP_GLYPH              0x00400
-#define SVGA_CAP_GLYPH_CLIPPING     0x00800
-#define SVGA_CAP_OFFSCREEN_1        0x01000
-#define SVGA_CAP_ALPHA_BLEND        0x02000
-#define SVGA_CAP_3D                 0x04000
-#define SVGA_CAP_EXTENDED_FIFO      0x08000
-#define SVGA_CAP_MULTIMON           0x10000
-#define SVGA_CAP_PITCHLOCK          0x20000
-#define SVGA_CAP_IRQMASK            0x40000
+#define SVGA_CAP_NONE               0x00000000
+#define SVGA_CAP_RECT_FILL	    0x00000001
+#define SVGA_CAP_RECT_COPY	    0x00000002
+#define SVGA_CAP_RECT_PAT_FILL      0x00000004
+#define SVGA_CAP_LEGACY_OFFSCREEN   0x00000008
+#define SVGA_CAP_RASTER_OP	    0x00000010
+#define SVGA_CAP_CURSOR		    0x00000020
+#define SVGA_CAP_CURSOR_BYPASS	    0x00000040
+#define SVGA_CAP_CURSOR_BYPASS_2    0x00000080
+#define SVGA_CAP_8BIT_EMULATION     0x00000100
+#define SVGA_CAP_ALPHA_CURSOR       0x00000200
+#define SVGA_CAP_GLYPH              0x00000400
+#define SVGA_CAP_GLYPH_CLIPPING     0x00000800
+#define SVGA_CAP_OFFSCREEN_1        0x00001000
+#define SVGA_CAP_ALPHA_BLEND        0x00002000
+#define SVGA_CAP_3D                 0x00004000
+#define SVGA_CAP_EXTENDED_FIFO      0x00008000
+#define SVGA_CAP_MULTIMON           0x00010000
+#define SVGA_CAP_PITCHLOCK          0x00020000
+#define SVGA_CAP_IRQMASK            0x00040000
+#define SVGA_CAP_DISPLAY_TOPOLOGY   0x00080000
+
 
 /*
  *  Raster op codes (same encoding as X) used by FIFO drivers.
@@ -200,6 +209,8 @@ enum {
 #define SVGA_NUM_SUPPORTED_ROPS   16
 #define SVGA_ROP_ALL            (MASK(SVGA_NUM_SUPPORTED_ROPS))
 #define SVGA_IS_VALID_ROP(rop)  (rop < SVGA_NUM_SUPPORTED_ROPS)
+
+#define SVGA_INVALID_DISPLAY_ID ((uint32)-1)
 
 /*
  *  Ops
