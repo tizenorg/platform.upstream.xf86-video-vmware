@@ -170,7 +170,7 @@ typedef VMWAREVideoRec *VMWAREVideoPtr;
 /*
  * Callback functions
  */
-#if XORG_VERSION_CURRENT > XORG_VERSION_NUMERIC(7, 0, 0, 0, 0) || XORG_VERSION_CURRENT < XORG_VERSION_NUMERIC(4, 0, 0, 0, 0)
+#if XORG_VERSION_CURRENT > XORG_VERSION_NUMERIC(7, 0, 0, 0, 0) || XORG_VERSION_CURRENT < XORG_VERSION_NUMERIC(2, 0, 0, 0, 0)
 static int vmwareXvPutImage(ScrnInfoPtr pScrn, short src_x, short src_y,
                             short drw_x, short drw_y, short src_w, short src_h,
                             short drw_w, short drw_h, int image,

@@ -8,7 +8,10 @@
 #ifndef VMWARE_H
 #define VMWARE_H
 
+#include "xorgVersion.h"
+#if XORG_VERSION_CURRENT >= XORG_VERSION_NUMERIC(7, 1, 0, 0, 0) || XORG_VERSION_CURRENT < XORG_VERSION_NUMERIC(2, 0, 0, 0, 0)
 #include <string.h>
+#endif
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
