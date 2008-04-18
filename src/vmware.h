@@ -272,7 +272,7 @@ void VMwareCtrl_ExtInit(ScrnInfoPtr pScrn);
 void VMwareXinerama_ExtInit(ScrnInfoPtr pScrn);
 
 /* vmwarevideo.c */
-Bool vmwareInitVideo(
+Bool vmwareVideoInit(
    ScreenPtr pScreen
    );
 void vmwareVideoEnd(

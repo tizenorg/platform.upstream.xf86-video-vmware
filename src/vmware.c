@@ -386,7 +386,7 @@ VMXGetVMwareSvgaId(VMWAREPtr pVMWARE)
     return SVGA_ID_INVALID;
 }
 
-
+#ifndef XSERVER_LIBPCIACCESS
 /*
  *----------------------------------------------------------------------
  *
@@ -432,6 +432,7 @@ RewriteTagString(const char *istr, char *ostr, int osize)
 	*op++ = chr;
     } while (chr);
 }
+#endif
 
 static void
 VMWAREIdentify(int flags)
@@ -1766,8 +1767,6 @@ static void
 VMWARELeaveVT(int scrnIndex, int flags)
 {
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
-    VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
-
     VMWARERestore(pScrn);
 }
 
@@ -1796,8 +1795,6 @@ VMwarePciProbe (DriverPtr           drv,
 {
     ScrnInfoPtr     scrn = NULL;
     EntityInfoPtr   entity;
-    /*I830EntPtr	    i830_ent = NULL;*/
-    DevUnion	    *private;
 
     scrn = xf86ConfigPciEntity(scrn, 0, entity_num, VMWAREPciChipsets,
                                NULL, NULL, NULL, NULL, NULL);

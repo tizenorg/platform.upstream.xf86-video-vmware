@@ -311,7 +311,6 @@ VMwareCtrlSetTopology(ClientPtr client)
    ExtensionEntry *ext;
    register int n;
    xXineramaScreenInfo *extents;
-   size_t i;
 
    REQUEST_AT_LEAST_SIZE(xVMwareCtrlSetTopologyReq);
 

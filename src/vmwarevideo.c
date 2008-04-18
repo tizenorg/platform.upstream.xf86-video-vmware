@@ -224,7 +224,7 @@ static void vmwareVideoEndStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid);
 /*
  * Offscreen memory manager functions
  */
-static void vmwareOffscreenInit();
+static void vmwareOffscreenInit(void);
 static VMWAREOffscreenPtr vmwareOffscreenAllocate(VMWAREPtr pVMWARE,
                                                   uint32 size);
 static void vmwareOffscreenFree(VMWAREOffscreenPtr memptr);
@@ -282,7 +282,7 @@ vmwareCheckVideoSanity(ScrnInfoPtr pScrn)
  */
 
 static void
-vmwareOffscreenInit()
+vmwareOffscreenInit(void)
 {
     offscreenMgr.size = 0;
     offscreenMgr.offset  = 0;
@@ -415,7 +415,6 @@ Bool vmwareVideoEnabled(VMWAREPtr pVMWARE)
 Bool vmwareVideoInit(ScreenPtr pScreen)
 {
     ScrnInfoPtr pScrn = infoFromScreen(pScreen);
-    VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
     XF86VideoAdaptorPtr *overlayAdaptors, *newAdaptors = NULL;
     XF86VideoAdaptorPtr newAdaptor = NULL;
     int numAdaptors;
@@ -615,7 +614,6 @@ static int vmwareVideoInitStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
                                  unsigned char *buf, short width, short height)
 {
     VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
-    ScreenPtr pScreen = pScrn->pScreen;
     int i;
 
     TRACEPOINT
