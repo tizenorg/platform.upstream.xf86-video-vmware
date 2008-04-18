@@ -15,8 +15,8 @@
  * Video formats we support
  */
 
-#define VMWARE_FOURCC_YV12 0x32315659 // 'Y' 'V' '1' '2'
-#define VMWARE_FOURCC_YUY2 0x32595559 // 'Y' 'U' 'Y' '2'
+#define VMWARE_FOURCC_YV12 0x32315659 /* 'Y' 'V' '1' '2' */
+#define VMWARE_FOURCC_YUY2 0x32595559 /* 'Y' 'U' 'Y' '2' */
 
 #define SVGA_ESCAPE_VMWARE_VIDEO             0x00020000
 
@@ -34,7 +34,7 @@ typedef struct SVGAEscapeVideoSetRegs {
       uint32 streamId;
    } header;
 
-   // May include zero or more items.
+   /* May include zero or more items. */
    struct {
       uint32 registerId;
       uint32 value;
@@ -46,4 +46,4 @@ typedef struct SVGAEscapeVideoFlush {
    uint32 streamId;
 } SVGAEscapeVideoFlush;
 
-#endif // _SVGA_OVERLAY_H_
+#endif /* _SVGA_OVERLAY_H_ */

@@ -320,7 +320,7 @@ enum {
 
    SVGA_FIFO_CAPABILITIES = 4,
    SVGA_FIFO_FLAGS,
-   // Valid with SVGA_FIFO_CAP_FENCE:
+   /* Valid with SVGA_FIFO_CAP_FENCE: */
    SVGA_FIFO_FENCE,
 
    /*
@@ -333,17 +333,17 @@ enum {
     * extended FIFO.
     */
    
-   // Valid if exists (i.e. if extended FIFO enabled):
+   /* Valid if exists (i.e. if extended FIFO enabled): */
    SVGA_FIFO_3D_HWVERSION,       /* See SVGA3dHardwareVersion in svga3d_reg.h */
-   // Valid with SVGA_FIFO_CAP_PITCHLOCK:
+   /* Valid with SVGA_FIFO_CAP_PITCHLOCK: */
    SVGA_FIFO_PITCHLOCK,
-   // Valid with SVGA_FIFO_CAP_CURSOR_BYPASS_3:
+   /* Valid with SVGA_FIFO_CAP_CURSOR_BYPASS_3: */
    SVGA_FIFO_CURSOR_ON,          /* Cursor bypass 3 show/hide register */
    SVGA_FIFO_CURSOR_X,           /* Cursor bypass 3 x register */
    SVGA_FIFO_CURSOR_Y,           /* Cursor bypass 3 y register */
    SVGA_FIFO_CURSOR_COUNT,       /* Incremented when any of the other 3 change */
    SVGA_FIFO_CURSOR_LAST_UPDATED,/* Last time the host updated the cursor */
-   // Valid with SVGA_FIFO_CAP_RESERVE:
+   /* Valid with SVGA_FIFO_CAP_RESERVE: */
    SVGA_FIFO_RESERVED,           /* Bytes past NEXT_CMD with real contents */
    /*
     * XXX: The gap here, up until SVGA_FIFO_3D_CAPS, can be used for new
@@ -382,7 +382,7 @@ enum {
     * sets SVGA_FIFO_MIN high enough to leave room for them.
     */
 
-   // Valid if register exists:
+   /* Valid if register exists: */
    SVGA_FIFO_GUEST_3D_HWVERSION, /* Guest driver's 3D version */
    SVGA_FIFO_FENCE_GOAL,         /* Matching target for SVGA_IRQFLAG_FENCE_GOAL */
    SVGA_FIFO_BUSY,               /* See "FIFO Synchronization Registers" */
@@ -553,7 +553,7 @@ enum {
 
 #define SVGA_FIFO_FLAG_NONE                 0
 #define SVGA_FIFO_FLAG_ACCELFRONT       (1<<0)
-#define SVGA_FIFO_FLAG_RESERVED        (1<<31) // Internal use only
+#define SVGA_FIFO_FLAG_RESERVED        (1<<31) /* Internal use only */
 
 /*
  * FIFO reservation sentinel value
@@ -817,13 +817,13 @@ typedef struct SVGAOverlayUnit {
 /*
  * Location and size of SVGA frame buffer and the FIFO.
  */
-#define SVGA_VRAM_MIN_SIZE   (4 * 640 * 480)  // bytes
+#define SVGA_VRAM_MIN_SIZE   (4 * 640 * 480)  /* bytes */
 #define SVGA_VRAM_MAX_SIZE   (128 * 1024 * 1024)
 
-#define SVGA_VRAM_SIZE_WS       (16 * 1024 * 1024) // 16 MB
-#define SVGA_MEM_SIZE_WS        (2  * 1024 * 1024) // 2  MB
-#define SVGA_VRAM_SIZE_SERVER   (4  * 1024 * 1024) // 4  MB
-#define SVGA_MEM_SIZE_SERVER    (256 * 1024)       // 256 KB
+#define SVGA_VRAM_SIZE_WS       (16 * 1024 * 1024) /* 16 MB */
+#define SVGA_MEM_SIZE_WS        (2  * 1024 * 1024) /* 2  MB */
+#define SVGA_VRAM_SIZE_SERVER   (4  * 1024 * 1024) /* 4  MB */
+#define SVGA_MEM_SIZE_SERVER    (256 * 1024)       /* 256 KB */
 
 #if /* defined(VMX86_WGS) || */ defined(VMX86_SERVER)
 #define SVGA_VRAM_SIZE         SVGA_VRAM_SIZE_SERVER
