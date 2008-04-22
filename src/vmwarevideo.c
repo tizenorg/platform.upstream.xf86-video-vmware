@@ -45,10 +45,6 @@
 #include "svga_overlay.h"
 
 #include <X11/extensions/Xv.h>
-/*
- * Need this to figure out which prototype to use for XvPutImage
- */
-#include "xorgVersion.h"
 
 #define MAKE_ATOM(a) MakeAtom(a, sizeof(a) - 1, TRUE)
 
@@ -170,7 +166,7 @@ typedef VMWAREVideoRec *VMWAREVideoPtr;
 /*
  * Callback functions
  */
-#if XORG_VERSION_CURRENT > XORG_VERSION_NUMERIC(7, 0, 0, 0, 0) || XORG_VERSION_CURRENT < XORG_VERSION_NUMERIC(2, 0, 0, 0, 0)
+#ifdef HAVE_XORG_SERVER_1_0_99_901
 static int vmwareXvPutImage(ScrnInfoPtr pScrn, short src_x, short src_y,
                             short drw_x, short drw_y, short src_w, short src_h,
                             short drw_w, short drw_h, int image,
@@ -968,7 +964,7 @@ static void vmwareVideoEndStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid)
  *-----------------------------------------------------------------------------
  */
 
-#if XORG_VERSION_CURRENT > XORG_VERSION_NUMERIC(7, 0, 0, 0, 0) || XORG_VERSION_CURRENT < XORG_VERSION_NUMERIC(4, 0, 0, 0, 0)
+#ifdef HAVE_XORG_SERVER_1_0_99_901
 static int vmwareXvPutImage(ScrnInfoPtr pScrn, short src_x, short src_y,
                             short drw_x, short drw_y, short src_w, short src_h,
                             short drw_w, short drw_h, int format,

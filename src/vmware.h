@@ -8,8 +8,12 @@
 #ifndef VMWARE_H
 #define VMWARE_H
 
-#include "xorgVersion.h"
-#if XORG_VERSION_CURRENT >= XORG_VERSION_NUMERIC(7, 1, 0, 0, 0) || XORG_VERSION_CURRENT < XORG_VERSION_NUMERIC(2, 0, 0, 0, 0)
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#ifdef HAVE_XORG_SERVER_1_1_0
 #include <string.h>
 #endif
 
@@ -19,7 +23,6 @@
 
 #include <X11/extensions/panoramiXproto.h>
 
-#include "xorg-server.h"
 #ifdef XSERVER_LIBPCIACCESS
 #include <pciaccess.h>
 #endif
