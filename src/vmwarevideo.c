@@ -744,7 +744,27 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
 
     struct _cmdSetRegs cmdSetRegs;
     struct _item *items;
+    int size;
+    VMWAREVideoFmtData *fmtData;
+    unsigned short w, h;
 
+    w = width;
+    h = height;
+    fmtData = pVid->fmt_priv;
+
+    size = vmwareQueryImageAttributes(pScrn, format, &w, &h,
+                                      fmtData->pitches, fmtData->offsets);
+    ASSERT(size != -1);
+
+    if (size > pVid->size) {
+        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Increase in size of Xv video "
+                   "frame streamId:%d.\n", pVid->streamId);
+        vmwareStopVideo(pScrn, pVid, TRUE);
+        return pVid->play(pScrn, pVid, src_x, src_y, drw_x, drw_y, src_w, 
+                          src_h, drw_w, drw_h, format, buf, width, height);
+    }
+              
+    pVid->size = size;
     memcpy(pVid->bufs[pVid->currBuf].data, buf, pVid->size);
 
     cmdSetRegs.cmd = SVGA_CMD_ESCAPE;
@@ -763,8 +783,8 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
         pVid->bufs[pVid->currBuf].dataOffset;
     items[SVGA_VIDEO_SIZE].value = pVid->size;
     items[SVGA_VIDEO_FORMAT].value = format;
-    items[SVGA_VIDEO_WIDTH].value = width;
-    items[SVGA_VIDEO_HEIGHT].value = height;
+    items[SVGA_VIDEO_WIDTH].value = w;
+    items[SVGA_VIDEO_HEIGHT].value = h;
     items[SVGA_VIDEO_SRC_X].value = src_x;
     items[SVGA_VIDEO_SRC_Y].value = src_y;
     items[SVGA_VIDEO_SRC_WIDTH].value = src_w;
@@ -777,7 +797,7 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
     items[SVGA_VIDEO_FLAGS].value = pVid->flags;
 
     for (i = 0, regId = SVGA_VIDEO_PITCH_1; i < 3; i++, regId++) {
-        items[regId].value = pVid->fmt_priv->pitches[i];
+        items[regId].value = fmtData->pitches[i];
     }
 
     fifoItem = (uint32 *) &cmdSetRegs;
@@ -1022,6 +1042,7 @@ static void vmwareStopVideo(ScrnInfoPtr pScrn, pointer data, Bool Cleanup)
         return;
     }
     if (!Cleanup) {
+        VmwareLog(("vmwareStopVideo: Cleanup is FALSE.\n"));
         return;
     }
     vmwareVideoSetOneReg(pVMWARE, pVid->streamId,
