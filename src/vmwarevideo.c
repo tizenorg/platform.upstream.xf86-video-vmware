@@ -754,7 +754,6 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
 
     size = vmwareQueryImageAttributes(pScrn, format, &w, &h,
                                       fmtData->pitches, fmtData->offsets);
-    ASSERT(size != -1);
 
     if (size > pVid->size) {
         xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Increase in size of Xv video "
