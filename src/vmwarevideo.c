@@ -59,9 +59,9 @@
 #define VMWARE_VID_NUM_PORTS 1
 
 /*
- * Using green as the default colorKey
+ * Using a dark shade as the default colorKey
  */
-#define VMWARE_VIDEO_COLORKEY 0x00ff00
+#define VMWARE_VIDEO_COLORKEY 0x100701
 
 /*
  * Maximum dimensions
@@ -87,14 +87,15 @@ static XF86VideoFormatRec vmwareVideoFormats[] =
     { 24, TrueColor}
 };
 
-#define VMWARE_VID_NUM_IMAGES 2
+#define VMWARE_VID_NUM_IMAGES 3
 static XF86ImageRec vmwareVideoImages[] =
 {
     XVIMAGE_YV12,
-    XVIMAGE_YUY2
+    XVIMAGE_YUY2,
+    XVIMAGE_UYVY
 };
 
-#define VMWARE_VID_NUM_ATTRIBUTES 1
+#define VMWARE_VID_NUM_ATTRIBUTES 2
 static XF86AttributeRec vmwareVideoAttributes[] =
 {
     {
@@ -102,6 +103,12 @@ static XF86AttributeRec vmwareVideoAttributes[] =
         0x000000,
         0xffffff,
         "XV_COLORKEY"
+    },
+    {
+        XvGettable | XvSettable,
+        0,
+        1,
+        "XV_AUTOPAINT_COLORKEY"
     }
 };
 
@@ -147,7 +154,7 @@ struct VMWAREVideoRec {
    int                (*play)(ScrnInfoPtr, struct VMWAREVideoRec *,
                               short, short, short, short, short,
                               short, short, short, int, unsigned char*,
-                              short, short);
+                              short, short, RegionPtr);
    /*
     * Offscreen memory region used to pass video data to the host.
     */
@@ -156,7 +163,9 @@ struct VMWAREVideoRec {
    uint8              currBuf;
    uint32             size;
    uint32             colorKey;
+   Bool               isAutoPaintColorkey;
    uint32             flags;
+   BoxRec             position;
    VMWAREVideoFmtData *fmt_priv;
 };
 
@@ -202,7 +211,8 @@ static int vmwareVideoInitStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
                                  short src_x, short src_y, short drw_x,
                                  short drw_y, short src_w, short src_h,
                                  short drw_w, short drw_h, int format,
-                                 unsigned char *buf, short width, short height);
+                                 unsigned char *buf, short width,
+                                 short height, RegionPtr clipBoxes);
 static int vmwareVideoInitAttributes(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
                                      int format, unsigned short width,
                                      unsigned short height);
@@ -211,11 +221,13 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
                            short drw_y, short src_w, short src_h,
                            short drw_w, short drw_h, int format,
                            unsigned char *buf, short width,
-                           short height);
+                           short height, RegionPtr clipBoxes);
 static void vmwareVideoFlush(VMWAREPtr pVMWARE, uint32 streamId);
 static void vmwareVideoSetOneReg(VMWAREPtr pVMWARE, uint32 streamId,
                                  uint32 regId, uint32 value);
 static void vmwareVideoEndStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid);
+static Bool vmwareVideoMoved(VMWAREVideoPtr pVid, short drw_x,
+                             short drw_y, short drw_w, short drw_h);
 
 /*
  * Offscreen memory manager functions
@@ -557,6 +569,7 @@ static XF86VideoAdaptorPtr vmwareVideoSetup(ScrnInfoPtr pScrn)
         pPriv[i].play = vmwareVideoInitStream;
         pPriv[i].flags = SVGA_VIDEO_FLAG_COLORKEY;
         pPriv[i].colorKey = VMWARE_VIDEO_COLORKEY;
+        pPriv[i].isAutoPaintColorkey = TRUE;
         adaptor->pPortPrivates[i].ptr = &pPriv[i];
     }
     pVMWARE->videoStreams = du;
@@ -607,7 +620,8 @@ static int vmwareVideoInitStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
                                  short src_x, short src_y, short drw_x,
                                  short drw_y, short src_w, short src_h,
                                  short drw_w, short drw_h, int format,
-                                 unsigned char *buf, short width, short height)
+                                 unsigned char *buf, short width,
+                                 short height, RegionPtr clipBoxes)
 {
     VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
     int i;
@@ -646,12 +660,21 @@ static int vmwareVideoInitStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
     }
     pVid->currBuf = 0;
 
+    pVid->position.x1 = drw_x;
+    pVid->position.y1 = drw_y;
+    pVid->position.x2 = drw_w;
+    pVid->position.y2 = drw_h;
+
+    if (pVid->isAutoPaintColorkey) {
+        xf86XVFillKeyHelper(pScrn->pScreen, pVid->colorKey, clipBoxes);
+    }
+
     VmwareLog(("Got offscreen region, offset %d, size %d "
                "(yuv size in bytes: %d)\n",
                pVid->fbarea->offset, pVid->fbarea->size, pVid->size));
 
     return pVid->play(pScrn, pVid, src_x, src_y, drw_x, drw_y, src_w, src_h,
-                      drw_w, drw_h, format, buf, width, height);
+                      drw_w, drw_h, format, buf, width, height, clipBoxes);
 }
 
 
@@ -719,7 +742,7 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
                            short drw_y, short src_w, short src_h,
                            short drw_w, short drw_h, int format,
                            unsigned char *buf, short width,
-                           short height)
+                           short height, RegionPtr clipBoxes)
 {
     VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
     uint32 *fifoItem;
@@ -759,10 +782,11 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
         xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Increase in size of Xv video "
                    "frame streamId:%d.\n", pVid->streamId);
         vmwareStopVideo(pScrn, pVid, TRUE);
-        return pVid->play(pScrn, pVid, src_x, src_y, drw_x, drw_y, src_w, 
-                          src_h, drw_w, drw_h, format, buf, width, height);
+        return pVid->play(pScrn, pVid, src_x, src_y, drw_x, drw_y, src_w,
+                          src_h, drw_w, drw_h, format, buf, width, height,
+                          clipBoxes);
     }
-              
+
     pVid->size = size;
     memcpy(pVid->bufs[pVid->currBuf].data, buf, pVid->size);
 
@@ -804,9 +828,23 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
         vmwareWriteWordToFIFO(pVMWARE, fifoItem[i]);
     }
 
+    if (pVid->isAutoPaintColorkey &&
+        vmwareVideoMoved(pVid, drw_x, drw_y, drw_w, drw_h)) {
+        xf86XVFillKeyHelper(pScrn->pScreen, pVid->colorKey, clipBoxes);
+    }
+
     vmwareVideoFlush(pVMWARE, pVid->streamId);
 
+    /*
+     * Update the position of the video frame.
+     */
+    pVid->position.x1 = drw_x;
+    pVid->position.y1 = drw_y;
+    pVid->position.x2 = drw_w;
+    pVid->position.y2 = drw_h;
+
     pVid->currBuf = ++pVid->currBuf & (VMWARE_VID_NUM_BUFFERS - 1);
+
     return Success;
 }
 
@@ -933,6 +971,7 @@ static void vmwareVideoSetOneReg(VMWAREPtr pVMWARE, uint32 streamId,
 static void vmwareVideoEndStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid)
 {
     uint32 id, colorKey, flags;
+    Bool isAutoPaintColorkey;
 
     if (pVid->fmt_priv) {
         free(pVid->fmt_priv);
@@ -951,11 +990,41 @@ static void vmwareVideoEndStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid)
     id = pVid->streamId;
     colorKey = pVid->colorKey;
     flags = pVid->flags;
+    isAutoPaintColorkey = pVid->isAutoPaintColorkey;
+
     memset(pVid, 0, sizeof(*pVid));
+
     pVid->streamId = id;
     pVid->play = vmwareVideoInitStream;
     pVid->colorKey = colorKey;
     pVid->flags = flags;
+    pVid->isAutoPaintColorkey = isAutoPaintColorkey;
+}
+
+
+/*
+ *-----------------------------------------------------------------------------
+ *
+ * vmwareVideoMoved --
+ *
+ *    Detects whether the video frame has changed its position.
+ *
+ * Results:
+ *    TRUE if the position has changed, FALSE otherwise.
+ *
+ * Side effects:
+ *    None.
+ *
+ *-----------------------------------------------------------------------------
+ */
+
+static Bool vmwareVideoMoved(VMWAREVideoPtr pVid, short drw_x,
+                             short drw_y, short drw_w, short drw_h)
+{
+    return !(pVid->position.x1 == drw_x &&
+             pVid->position.y1 == drw_y &&
+             pVid->position.x2 == drw_w &&
+             pVid->position.y2 == drw_h);
 }
 
 
@@ -1008,7 +1077,7 @@ static int vmwareXvPutImage(ScrnInfoPtr pScrn, short src_x, short src_y,
     }
 
     return pVid->play(pScrn, pVid, src_x, src_y, drw_x, drw_y, src_w, src_h,
-                      drw_w, drw_h, format, buf, width, height);
+                      drw_w, drw_h, format, buf, width, height, clipBoxes);
 }
 
 
@@ -1115,6 +1184,7 @@ static int vmwareQueryImageAttributes(ScrnInfoPtr pScrn, int format,
            }
            size += tmp;
            break;
+       case FOURCC_UYVY:
        case FOURCC_YUY2:
            size = *width * 2;
            if (pitches) {
@@ -1153,12 +1223,18 @@ static int vmwareSetPortAttribute(ScrnInfoPtr pScrn, Atom attribute,
 {
     VMWAREVideoPtr pVid = (VMWAREVideoPtr) data;
     Atom xvColorKey = MAKE_ATOM("XV_COLORKEY");
+    Atom xvAutoPaint = MAKE_ATOM("XV_AUTOPAINT_COLORKEY");
 
     if (attribute == xvColorKey) {
+        VmwareLog(("Set colorkey:0x%x\n", value));
         pVid->colorKey = value;
+    } else if (attribute == xvAutoPaint) {
+        VmwareLog(("Set autoPaint: %s\n", value? "TRUE": "FALSE"));
+        pVid->isAutoPaintColorkey = value;
     } else {
         return XvBadAlloc;
     }
+
     return Success;
 }
 
@@ -1186,12 +1262,16 @@ static int vmwareGetPortAttribute(ScrnInfoPtr pScrn, Atom attribute,
 {
     VMWAREVideoPtr pVid = (VMWAREVideoPtr) data;
     Atom xvColorKey = MAKE_ATOM("XV_COLORKEY");
+    Atom xvAutoPaint = MAKE_ATOM("XV_AUTOPAINT_COLORKEY");
 
     if (attribute == xvColorKey) {
         *value = pVid->colorKey;
+    } else if (attribute == xvAutoPaint) {
+        *value = pVid->isAutoPaintColorkey;
     } else {
         return XvBadAlloc;
     }
+
     return Success;
 }
 
