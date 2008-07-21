@@ -165,7 +165,7 @@ struct VMWAREVideoRec {
    uint32             colorKey;
    Bool               isAutoPaintColorkey;
    uint32             flags;
-   BoxRec             position;
+   RegionRec          clipBoxes;
    VMWAREVideoFmtData *fmt_priv;
 };
 
@@ -226,8 +226,6 @@ static void vmwareVideoFlush(VMWAREPtr pVMWARE, uint32 streamId);
 static void vmwareVideoSetOneReg(VMWAREPtr pVMWARE, uint32 streamId,
                                  uint32 regId, uint32 value);
 static void vmwareVideoEndStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid);
-static Bool vmwareVideoMoved(VMWAREVideoPtr pVid, short drw_x,
-                             short drw_y, short drw_w, short drw_h);
 
 /*
  * Offscreen memory manager functions
@@ -660,10 +658,7 @@ static int vmwareVideoInitStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
     }
     pVid->currBuf = 0;
 
-    pVid->position.x1 = drw_x;
-    pVid->position.y1 = drw_y;
-    pVid->position.x2 = drw_w;
-    pVid->position.y2 = drw_h;
+    REGION_COPY(pScrn->pScreen, &pVid->clipBoxes, clipBoxes);
 
     if (pVid->isAutoPaintColorkey) {
         xf86XVFillKeyHelper(pScrn->pScreen, pVid->colorKey, clipBoxes);
@@ -828,20 +823,17 @@ static int vmwareVideoPlay(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
         vmwareWriteWordToFIFO(pVMWARE, fifoItem[i]);
     }
 
-    if (pVid->isAutoPaintColorkey &&
-        vmwareVideoMoved(pVid, drw_x, drw_y, drw_w, drw_h)) {
-        xf86XVFillKeyHelper(pScrn->pScreen, pVid->colorKey, clipBoxes);
+    /* 
+     *  Update the clipList and paint the colorkey, if required.
+     */
+    if (!REGION_EQUAL(pScrn->pScreen, &pVid->clipBoxes, clipBoxes)) {
+        REGION_COPY(pScrn->pScreen, &pVid->clipBoxes, clipBoxes);
+        if (pVid->isAutoPaintColorkey) {
+            xf86XVFillKeyHelper(pScrn->pScreen, pVid->colorKey, clipBoxes);
+        }
     }
 
     vmwareVideoFlush(pVMWARE, pVid->streamId);
-
-    /*
-     * Update the position of the video frame.
-     */
-    pVid->position.x1 = drw_x;
-    pVid->position.y1 = drw_y;
-    pVid->position.x2 = drw_w;
-    pVid->position.y2 = drw_h;
 
     pVid->currBuf = ++pVid->currBuf & (VMWARE_VID_NUM_BUFFERS - 1);
 
@@ -999,32 +991,6 @@ static void vmwareVideoEndStream(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid)
     pVid->colorKey = colorKey;
     pVid->flags = flags;
     pVid->isAutoPaintColorkey = isAutoPaintColorkey;
-}
-
-
-/*
- *-----------------------------------------------------------------------------
- *
- * vmwareVideoMoved --
- *
- *    Detects whether the video frame has changed its position.
- *
- * Results:
- *    TRUE if the position has changed, FALSE otherwise.
- *
- * Side effects:
- *    None.
- *
- *-----------------------------------------------------------------------------
- */
-
-static Bool vmwareVideoMoved(VMWAREVideoPtr pVid, short drw_x,
-                             short drw_y, short drw_w, short drw_h)
-{
-    return !(pVid->position.x1 == drw_x &&
-             pVid->position.y1 == drw_y &&
-             pVid->position.x2 == drw_w &&
-             pVid->position.y2 == drw_h);
 }
 
 
