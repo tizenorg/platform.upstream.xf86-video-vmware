@@ -294,4 +294,8 @@ void vmwareCheckVideoSanity(
    ScrnInfoPtr pScrn
    );
 
+/* vmwaremode.c */
+void vmwareGetSupportedModelines(
+   DisplayModePtr *monitorModes
+   );
 #endif

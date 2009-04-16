@@ -921,6 +921,11 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     clockRanges->doubleScanAllowed = FALSE;
     clockRanges->ClockMulFactor = 1;
     clockRanges->ClockDivFactor = 1;
+   
+    /*
+     * Get the default supported modelines
+     */
+    vmwareGetSupportedModelines(&pScrn->monitor->Modes);
 
     i = xf86ValidateModes(pScrn, pScrn->monitor->Modes, pScrn->display->modes,
                           clockRanges, NULL, 256, pVMWARE->maxWidth, 32 * 32,
