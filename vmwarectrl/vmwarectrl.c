@@ -30,7 +30,7 @@ main (int argc, char **argv)
       exit(EXIT_FAILURE);
    }
 
-   if (argc == 2) {
+   if (argc >= 2) {
       if (strcmp(argv[1], "setres") == 0) {
          int x, y;
          if (argc < 4) {
@@ -38,8 +38,8 @@ main (int argc, char **argv)
             exit(EXIT_FAILURE);
          }
 
-         x = atoi(argv[1]);
-         y = atoi(argv[2]);
+         x = atoi(argv[2]);
+         y = atoi(argv[3]);
 
          if (VMwareCtrl_SetRes(dpy, screen, x, y)) {
             printf("Set Res was successful\n");
