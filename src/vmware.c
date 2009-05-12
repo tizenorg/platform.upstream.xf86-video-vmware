@@ -1784,8 +1784,7 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
      * We will lazily add the dynamic modes as the are needed when new
      * modes are requested through the control extension.
      */
-    pVMWARE->dynMode1 = NULL;
-    pVMWARE->dynMode2 = NULL;
+    memset(&pVMWARE->dynModes, 0, sizeof pVMWARE->dynModes);
 
 #if VMWARE_DRIVER_FUNC
     pScrn->DriverFunc = VMWareDriverFunc;

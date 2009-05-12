@@ -46,6 +46,9 @@
 /* Arbitrarily choose max cursor dimensions.  The emulation doesn't care. */
 #define MAX_CURS        32
 
+#define NUM_DYN_MODES   2
+
+
 typedef struct {
     CARD32 svga_reg_enable;
     CARD32 svga_reg_width;
@@ -94,8 +97,7 @@ typedef struct {
     VMWARERegRec SavedReg;
     VMWARERegRec ModeReg;
 
-    DisplayModePtr dynMode1;
-    DisplayModePtr dynMode2;
+    DisplayModePtr dynModes[NUM_DYN_MODES];
 
     Bool* pvtSema;
 
