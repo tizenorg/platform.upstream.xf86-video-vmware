@@ -102,6 +102,7 @@ typedef struct {
 
     VMWARERegRec SavedReg;
     VMWARERegRec ModeReg;
+    CARD32 suspensionSavedRegId;
 
     DisplayModePtr dynModes[NUM_DYN_MODES];
 

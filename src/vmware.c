@@ -652,6 +652,7 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
                    "No supported VMware SVGA found (read ID 0x%08x).\n", id);
         return FALSE;
     }
+    pVMWARE->suspensionSavedRegId = id;
 
 #if !XSERVER_LIBPCIACCESS
     pVMWARE->PciTag = pciTag(pVMWARE->PciInfo->bus, pVMWARE->PciInfo->device,
@@ -1820,7 +1821,13 @@ VMWAREEnterVT(int scrnIndex, int flags)
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
 
-    if (!pVMWARE->SavedReg.svga_fifo_enabled) {
+    /*
+     * After system resumes from hiberation, EnterVT will be called and this
+     * is a good place to restore the SVGA ID register.
+     */
+    vmwareWriteReg(pVMWARE, SVGA_REG_ID, pVMWARE->suspensionSavedRegId);
+
+    if (!pVMWARE->SavedReg.svga_fifo_enabled) {       
         VMWAREInitFIFO(pScrn);
     }
 
@@ -1831,6 +1838,14 @@ static void
 VMWARELeaveVT(int scrnIndex, int flags)
 {
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
+    VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
+
+    /*
+     * Before shutting down system for hibneration, LeaveVT will be called,
+     * we save the ID register value here and later restore it in EnterVT.
+     */
+    pVMWARE->suspensionSavedRegId = vmwareReadReg(pVMWARE, SVGA_REG_ID);
+
     VMWARERestore(pScrn);
 }
 
