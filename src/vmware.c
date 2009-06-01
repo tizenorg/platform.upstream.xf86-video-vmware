@@ -306,7 +306,7 @@ vmwareSendSVGACmdUpdate(VMWAREPtr pVMWARE, BoxPtr pBB)
     vmwareWriteWordToFIFO(pVMWARE, pBB->y2 - pBB->y1);
 }
 
-static void
+void
 vmwareSendSVGACmdUpdateFullScreen(VMWAREPtr pVMWARE)
 {
     BoxRec BB;
@@ -1163,8 +1163,40 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool rebuildPixmap)
     vgaHWProtect(pScrn, FALSE);
 
     /*
-     * XXX -- If we want to check that we got the mode we asked for, this
-     * would be a good place.
+     * Push the new Xinerama state to X clients and the hardware,
+     * synchronously with the mode change. Note that this must happen
+     * AFTER we write the new width and height to the hardware
+     * registers, since updating the WIDTH and HEIGHT registers will
+     * reset the device's multimon topology.
+     */
+    vmwareNextXineramaState(pVMWARE);
+
+    return TRUE;
+}
+
+void
+vmwareNextXineramaState(VMWAREPtr pVMWARE)
+{
+    VMWARERegPtr vmwareReg = &pVMWARE->ModeReg;
+
+    /*
+     * Switch to the next Xinerama state (from pVMWARE->xineramaNextState).
+     *
+     * This new state will be available to X clients via the Xinerama
+     * extension, and we push the new state to the virtual hardware,
+     * in order to configure a number of virtual monitors within the
+     * device's framebuffer.
+     *
+     * This function can be called at any time, but it should usually be
+     * called just after a mode switch. This is for two reasons:
+     *
+     *   1) We don't want X clients to see a Xinerama topology and a video
+     *      mode that are inconsistent with each other, so we'd like to switch
+     *      both at the same time.
+     *
+     *   2) We must set the host's display topology registers after setting
+     *      the new video mode, since writes to WIDTH/HEIGHT will reset the
+     *      hardware display topology.
      */
 
     /*
@@ -1178,7 +1210,14 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool rebuildPixmap)
 
           pVMWARE->xineramaNextState = NULL;
           pVMWARE->xineramaNextNumOutputs = 0;
+
        } else {
+          /*
+           * There is no next state pending. Switch back to
+           * single-monitor mode. This is necessary for resetting the
+           * Xinerama state if we get a mode change which doesn't
+           * follow a VMwareCtrlDoSetTopology call.
+           */
           VMWAREXineramaPtr basicState =
              (VMWAREXineramaPtr)xcalloc(1, sizeof (VMWAREXineramaRec));
           if (basicState) {
@@ -1195,7 +1234,8 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool rebuildPixmap)
     }
 
     /*
-     * Update host's view of guest topology.
+     * Update host's view of guest topology. This tells the device
+     * how we're carving up its framebuffer into virtual screens.
      */
     if (pVMWARE->vmwareCapability & SVGA_CAP_DISPLAY_TOPOLOGY) {
         if (pVMWARE->xinerama) {
@@ -1223,14 +1263,13 @@ VMWAREModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool rebuildPixmap)
             vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_IS_PRIMARY, TRUE);
             vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_POSITION_X, 0);
             vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_POSITION_Y, 0);
-            vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_WIDTH, mode->HDisplay);
-            vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_HEIGHT, mode->VDisplay);
+            vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_WIDTH, vmwareReg->svga_reg_width);
+            vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_HEIGHT, vmwareReg->svga_reg_height);
         }
 
+        /* Done. */
         vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_ID, SVGA_INVALID_DISPLAY_ID);
     }
-
-    return TRUE;
 }
 
 static void
@@ -1436,6 +1475,7 @@ VMWAREAddDisplayMode(ScrnInfoPtr pScrn,
    DisplayModeRec *mode;
 
    mode = xalloc(sizeof(DisplayModeRec));
+   memset(mode, 0, sizeof *mode);
 
    mode->name = xalloc(strlen(name) + 1);
    strcpy(mode->name, name);
