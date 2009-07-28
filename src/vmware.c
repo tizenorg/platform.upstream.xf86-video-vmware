@@ -118,7 +118,7 @@ static resRange vmwareLegacyRes[] = {
     _VGA_EXCLUSIVE, _END
 };
 #else
-static int vmwareLegacyRes = 0;
+#define vmwareLegacyRes NULL
 #endif
 
 #if XSERVER_LIBPCIACCESS
