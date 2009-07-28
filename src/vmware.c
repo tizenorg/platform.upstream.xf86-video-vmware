@@ -18,7 +18,9 @@ char rcsId_vmware[] =
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
+#ifndef XSERVER_LIBPCIACCESS
 #include "xf86Resources.h"
+#endif
 
 #include "compiler.h"	/* inb/outb */
 
@@ -109,11 +111,15 @@ static SymTabRec VMWAREChipsets[] = {
     { -1,                  NULL }
 };
 
+#ifndef XSERVER_LIBPCIACCESS
 static resRange vmwareLegacyRes[] = {
     { ResExcIoBlock, SVGA_LEGACY_BASE_PORT,
       SVGA_LEGACY_BASE_PORT + SVGA_NUM_PORTS*sizeof(uint32)},
     _VGA_EXCLUSIVE, _END
 };
+#else
+static int vmwareLegacyRes = 0;
+#endif
 
 #if XSERVER_LIBPCIACCESS
 
