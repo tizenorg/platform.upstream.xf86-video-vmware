@@ -436,24 +436,26 @@ VMWAREComposite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
     PictureScreenPtr ps = GetPictureScreen(pScreen);
     BoxRec box;
     Bool hidden = FALSE;
-    
-    VmwareLog(("VMWAREComposite op = %d, pSrc = %p, pMask = %p, pDst = %p,"
-               " src = (%d, %d), mask = (%d, %d), dst = (%d, %d), w = %d,"
-               " h = %d\n", op, pSrc, pMask, pDst, xSrc, ySrc, xMask, yMask,
-               xDst, yDst, width, height));
 
-    /*
-     * We only worry about the source region here, since shadowfb or XAA will
-     * take care of the destination region.
-     */
-    box.x1 = pSrc->pDrawable->x + xSrc;
-    box.y1 = pSrc->pDrawable->y + ySrc;
-    box.x2 = box.x1 + width;
-    box.y2 = box.y1 + height;
+    if (pSrc->pDrawable) {
+        VmwareLog(("VMWAREComposite op = %d, pSrc = %p, pMask = %p, pDst = %p,"
+                   " src = (%d, %d), mask = (%d, %d), dst = (%d, %d), w = %d,"
+                   " h = %d\n", op, pSrc, pMask, pDst, xSrc, ySrc, xMask, yMask,
+                   xDst, yDst, width, height));
 
-    if (BOX_INTERSECT(box, pVMWARE->hwcur.box)) {
-        PRE_OP_HIDE_CURSOR();
-        hidden = TRUE;
+        /*
+         * We only worry about the source region here, since shadowfb or XAA
+         * will take care of the destination region.
+         */
+        box.x1 = pSrc->pDrawable->x + xSrc;
+        box.y1 = pSrc->pDrawable->y + ySrc;
+        box.x2 = box.x1 + width;
+        box.y2 = box.y1 + height;
+
+        if (BOX_INTERSECT(box, pVMWARE->hwcur.box)) {
+            PRE_OP_HIDE_CURSOR();
+            hidden = TRUE;
+        }
     }
     
     ps->Composite = pVMWARE->Composite;
