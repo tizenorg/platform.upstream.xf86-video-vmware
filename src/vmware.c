@@ -146,6 +146,13 @@ static PciChipsets VMWAREPciChipsets[] = {
     { -1,		       -1,		    RES_UNDEFINED }
 };
 
+#if HAVE_XORG_SERVER_1_7_0
+
+#define xf86LoaderReqSymLists(...) do {} while (0)
+#define LoaderRefSymLists(...) do {} while (0)
+
+#else
+
 static const char *vgahwSymbols[] = {
     "vgaHWGetHWRec",
     "vgaHWGetIOBase",
@@ -177,6 +184,8 @@ static const char *shadowfbSymbols[] = {
     "ShadowFBInit2",
     NULL
 };
+
+#endif /* HAVE_XORG_SERVER_1_7_0 */
 
 #ifdef XFree86LOADER
 static XF86ModuleVersionInfo vmwareVersRec = {
