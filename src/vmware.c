@@ -81,8 +81,8 @@ char rcsId_vmware[] =
 #define VMW_INNERSTRINGIFY(s) #s
 #define VMW_STRING(str) VMW_INNERSTRINGIFY(str)
 
-#define VMWARE_NAME "VMWARE"
-#define VMWARE_DRIVER_NAME "vmware"
+#define VMWARE_NAME "vmwlegacy"
+#define VMWARE_DRIVER_NAME "vmwlegacy"
 #define VMWARE_MAJOR_VERSION	10
 #define VMWARE_MINOR_VERSION	16
 #define VMWARE_PATCHLEVEL	9
@@ -188,8 +188,8 @@ static const char *shadowfbSymbols[] = {
 #endif /* HAVE_XORG_SERVER_1_7_0 */
 
 #ifdef XFree86LOADER
-static XF86ModuleVersionInfo vmwareVersRec = {
-    "vmware",
+static XF86ModuleVersionInfo vmwlegacyVersRec = {
+    VMWARE_DRIVER_NAME,
     MODULEVENDORSTRING,
     MODINFOSTRING1,
     MODINFOSTRING2,
@@ -2021,7 +2021,7 @@ VMWAREProbe(DriverPtr drv, int flags)
 #endif
 
 
-_X_EXPORT DriverRec VMWARE = {
+_X_EXPORT DriverRec vmwlegacy = {
     VMWARE_DRIVER_VERSION,
     VMWARE_DRIVER_NAME,
     VMWAREIdentify,
@@ -2043,22 +2043,23 @@ _X_EXPORT DriverRec VMWARE = {
 };
 
 #ifdef XFree86LOADER
-static MODULESETUPPROTO(vmwareSetup);
+static MODULESETUPPROTO(vmwlegacySetup);
 
-_X_EXPORT XF86ModuleData vmwareModuleData = {
-    &vmwareVersRec,
-    vmwareSetup,
+_X_EXPORT XF86ModuleData vmwlegacyModuleData = {
+    &vmwlegacyVersRec,
+    vmwlegacySetup,
     NULL
 };
 
 static pointer
-vmwareSetup(pointer module, pointer opts, int *errmaj, int *errmin)
+vmwlegacySetup(pointer module, pointer opts, int *errmaj, int *errmin)
 {
     static Bool setupDone = FALSE;
 
     if (!setupDone) {
         setupDone = TRUE;
-        xf86AddDriver(&VMWARE, module, VMWARE_DRIVER_FUNC);
+
+        xf86AddDriver(&vmwlegacy, module, VMWARE_DRIVER_FUNC);
 
         LoaderRefSymLists(vgahwSymbols, fbSymbols, ramdacSymbols,
                           shadowfbSymbols, NULL);
