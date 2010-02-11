@@ -36,9 +36,31 @@
 #define VMWGFX_DRIVER_NAME    "vmwgfx"
 #define VMWLEGACY_DRIVER_NAME "vmwlegacy"
 
+#define VMW_STRING_INNER(s) #s
+#define VMW_STRING(str) VMW_STRING_INNER(str)
+
 #define VMWARE_VERSION_MAJOR 10
 #define VMWARE_VERSION_MINOR 16
 #define VMWARE_VERSION_PATCH 9
+#define VMWARE_VERSION_STRING_MAJOR VMW_STRING(VMWARE_VERSION_MAJOR)
+#define VMWARE_VERSION_STRING_MINOR VMW_STRING(VMWARE_VERSION_MINOR)
+#define VMWARE_VERSION_STRING_PATCH VMW_STRING(VMWARE_VERSION_PATCH)
+
+#define VMWARE_DRIVER_VERSION \
+   (VMWARE_VERSION_MAJOR * 65536 + VMWARE_VERSION_MINOR * 256 + VMWARE_VERSION_PATCH)
+#define VMWARE_DRIVER_VERSION_STRING \
+    VMWARE_VERSION_STRING_MAJOR "." VMWARE_VERSION_STRING_MINOR \
+    "." VMWARE_VERSION_STRING_PATCH
+
+/*
+ * Standard four digit version string expected by VMware Tools installer.
+ * As the driver's version is only  {major, minor, patchlevel}, simply append an
+ * extra zero for the fourth digit.
+ */
+#ifdef __GNUC__
+const char vmware_modinfo[] __attribute__((section(".modinfo"),unused)) =
+    "version=" VMWARE_DRIVER_VERSION_STRING ".0";
+#endif
 
 static XF86ModuleVersionInfo vmware_version;
 static MODULESETUPPROTO(vmware_setup);
