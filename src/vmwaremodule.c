@@ -58,7 +58,7 @@
  * extra zero for the fourth digit.
  */
 #ifdef __GNUC__
-const char vmware_modinfo[] __attribute__((section(".modinfo"),unused)) =
+const char vmware_drv_modinfo[] __attribute__((section(".modinfo"),unused)) =
     "version=" VMWARE_DRIVER_VERSION_STRING ".0";
 #endif
 

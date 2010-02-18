@@ -101,7 +101,7 @@ static const char VMWAREBuildStr[] = "VMware Guest X Server "
  * extra zero for the fourth digit.
  */
 #ifdef __GNUC__
-const char vm_svga_version[] __attribute__((section(".modinfo"),unused)) =
+const char vmwlegacy_drv_modinfo[] __attribute__((section(".modinfo"),unused)) =
     "version=" VMWARE_DRIVER_VERSION_STRING ".0";
 #endif
 
