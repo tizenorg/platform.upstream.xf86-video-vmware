@@ -23,10 +23,10 @@
 # -avoid-version prevents gratuitous .0.0.0 version numbers on the end
 # _ladir passes a dummy rpath to libtool so the thing will actually link
 # TODO: -nostdlib/-Bstatic/-lgcc platform magic, not installing the .a, etc.
-AM_CFLAGS = @XORG_CFLAGS@ @DRM_CFLAGS@
 
 vmwlegacy_drv_la_LTLIBRARIES = vmwlegacy_drv.la
 vmwlegacy_drv_la_LDFLAGS = -module -avoid-version
+vmwlegacy_drv_la_CFLAGS = @XORG_CFLAGS@
 vmwlegacy_drv_ladir = @moduledir@/drivers
 
 vmwlegacy_drv_la_SOURCES = \
@@ -54,6 +54,8 @@ vmwlegacy_drv_la_SOURCES = \
 
 vmware_drv_la_LTLIBRARIES = vmware_drv.la
 vmware_drv_la_LDFLAGS = -module -avoid-version
+vmware_drv_la_CFLAGS = @XORG_CFLAGS@ @DRM_CFLAGS@
+vmware_drv_la_LIBADD = @DRM_LIBS@
 vmware_drv_ladir = @moduledir@/drivers
 
 vmware_drv_la_SOURCES = \
