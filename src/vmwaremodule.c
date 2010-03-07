@@ -37,6 +37,7 @@
 
 #define VMWARE_DRIVER_NAME    "vmware"
 #define VMWGFX_DRIVER_NAME    "vmwgfx"
+#define VMWGFX_MODULE_NAME    "vmwgfx"
 #define VMWLEGACY_DRIVER_NAME "vmwlegacy"
 
 #define VMW_STRING_INNER(s) #s
@@ -76,9 +77,13 @@ static Bool
 vmware_check_kernel_module()
 {
     /* Super simple way of knowing if the kernel driver is loaded */
-    int ret = drmOpen("vmwgfx", NULL);
-    if (ret < 0)
+    int ret = drmOpen(VMWGFX_MODULE_NAME, NULL);
+    if (ret < 0) {
+	fprintf(stderr,
+		"%s: Please ignore above \"FATAL: Module %s not found.\"\n",
+		VMWARE_DRIVER_NAME, VMWGFX_MODULE_NAME);
 	return FALSE;
+    }
 
     drmClose(ret);
 
