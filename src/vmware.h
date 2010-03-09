@@ -132,6 +132,7 @@ typedef struct {
     CARD32* vmwareFIFO;
 
     xf86CursorInfoPtr CursorInfoRec;
+    CursorPtr oldCurs;
     struct {
         int bg, fg, x, y;
         int hotX, hotY;
