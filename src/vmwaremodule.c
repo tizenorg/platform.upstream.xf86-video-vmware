@@ -38,6 +38,9 @@
 #define VMWARE_DRIVER_NAME    "vmware"
 #define VMWGFX_DRIVER_NAME    "vmwgfx"
 #define VMWGFX_MODULE_NAME    "vmwgfx"
+#define VMWGFX_COMPAT_MAJOR   11
+#define VMWGFX_REQUIRED_MAJOR 11
+#define VMWGFX_REQUIRED_MINOR 0
 #define VMWLEGACY_DRIVER_NAME "vmwlegacy"
 
 #define VMW_STRING_INNER(s) #s
@@ -68,6 +71,7 @@ _X_EXPORT XF86ModuleData vmwareModuleData = {
     NULL
 };
 
+extern XF86ModuleData *VMWGFX_MODULE_DATA;
 
 /*
  * Chain loading functions
@@ -79,15 +83,64 @@ vmware_check_kernel_module()
     /* Super simple way of knowing if the kernel driver is loaded */
     int ret = drmOpen(VMWGFX_MODULE_NAME, NULL);
     if (ret < 0) {
-	fprintf(stderr,
-		"%s: Please ignore above \"FATAL: Module %s not found.\"\n",
-		VMWARE_DRIVER_NAME, VMWGFX_MODULE_NAME);
+	/* This shouldn't go in the log as the original message does not */
+	fprintf(stderr, "%s: Please ignore above \"FATAL: Module %s not found."
+		"\"\n", VMWARE_DRIVER_NAME, VMWGFX_MODULE_NAME);
+	/* This is what goes into the log on the other hand */
+	xf86DrvMsg(-1, X_PROBED, "%s: Please ignore above \"[drm] failed to "
+		   "load kernel  module \"%s\"\"\n", VMWARE_DRIVER_NAME,
+		   VMWGFX_MODULE_NAME);
 	return FALSE;
     }
 
     drmClose(ret);
 
     return TRUE;
+}
+
+static Bool
+vmware_check_vmwgfx_driver(int matched, pointer opts)
+{
+    int major; int minor;
+    pointer module;
+    CARD32 version;
+
+    if (matched) {
+	xf86DrvMsg(-1, X_PROBED, "%s: X configured to use %s X driver assume "
+		   "who ever did that knows what they are doing\n",
+		   VMWARE_DRIVER_NAME, VMWGFX_DRIVER_NAME);
+	/* Also how did they end up here, if the configured X to use vmwgfx and
+	 * X should load that driver for that hardware. And since there is only
+	 * one SVGA device this driver shouldn't be loaded. Weird...
+	 */
+	return TRUE;
+    }
+
+    module = xf86LoadOneModule(VMWGFX_DRIVER_NAME, opts);
+    if (!module) {
+	xf86DrvMsg(-1, X_ERROR, "%s: Please ignore the above warnings about "
+		   "not being able to to load module/driver %s\n",
+		   VMWARE_DRIVER_NAME, VMWGFX_DRIVER_NAME);
+	return FALSE;
+    }
+
+    version = xf86GetModuleVersion(module);
+    major = GET_MODULE_MAJOR_VERSION(version);
+    minor = GET_MODULE_MINOR_VERSION(version);
+
+    if (major > VMWGFX_COMPAT_MAJOR ||
+	major < VMWGFX_REQUIRED_MAJOR ||
+	(major == VMWGFX_REQUIRED_MAJOR && minor < VMWGFX_REQUIRED_MINOR)) {
+	xf86DrvMsg(-1, X_PROBED, "%s: The %s X driver failed version "
+		   "checking.\n", VMWARE_DRIVER_NAME, VMWGFX_DRIVER_NAME);
+	goto err;
+    }
+
+    return TRUE;
+
+err:
+    /* XXX We should drop the reference on the module here */
+    return FALSE;
 }
 
 static Bool
@@ -106,10 +159,15 @@ vmware_chain_module(pointer opts)
     vmwgfx_devices = xf86MatchDevice(VMWGFX_DRIVER_NAME, NULL);
     vmwlegacy_devices = xf86MatchDevice(VMWLEGACY_DRIVER_NAME, NULL);
 
-    if (vmware_check_kernel_module()) {
+    if (vmware_check_vmwgfx_driver(vmwgfx_devices, opts) &&
+	vmware_check_kernel_module()) {
+	xf86DrvMsg(-1, X_INFO, "%s: Using %s X driver.\n",
+		   VMWARE_DRIVER_NAME, VMWGFX_DRIVER_NAME);
 	driver_name = VMWGFX_DRIVER_NAME;
-	matched = vmwgfx_devices;
+	matched = 1;
     } else {
+	xf86DrvMsg(-1, X_INFO, "%s: Using %s driver everything is fine.\n",
+		   VMWARE_DRIVER_NAME, VMWLEGACY_DRIVER_NAME);
 	driver_name = VMWLEGACY_DRIVER_NAME;
 	matched = vmwlegacy_devices;
     }
