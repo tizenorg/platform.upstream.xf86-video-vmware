@@ -143,7 +143,7 @@ err:
     return FALSE;
 }
 
-static Bool
+static void
 vmware_chain_module(pointer opts)
 {
     int vmwlegacy_devices;
@@ -205,7 +205,6 @@ static pointer
 vmware_setup(pointer module, pointer opts, int *errmaj, int *errmin)
 {
     static Bool setupDone = 0;
-    int ret;
 
     /* This module should be loaded only once, but check to be sure. */
     if (!setupDone) {
