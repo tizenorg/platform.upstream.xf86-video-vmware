@@ -32,8 +32,6 @@
  */
 
 
-#define NEED_EVENTS
-#define NEED_REPLIES
 #include <X11/Xlibint.h>
 #include "libvmwarectrl.h"
 #include "vmwarectrlproto.h"
