@@ -172,7 +172,8 @@ vmware_chain_module(pointer opts)
 	matched = vmwlegacy_devices;
     }
 
-    for (i = 0; i < vmware_devices; i++) {
+    /* Xorg -configure returns 1 from xf86MatchDevice with NULL gdevs */
+    for (i = 0; gdevs && i < vmware_devices; i++) {
 	gdev = gdevs[i];
 	gdev->driver = driver_name;
     }
