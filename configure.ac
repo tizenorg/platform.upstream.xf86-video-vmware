@@ -82,8 +82,6 @@ PKG_CHECK_EXISTS([xorg-server >= 1.7.0],
 
 # Checks for libraries.
 
-# Checks for header files.
-AC_HEADER_STDC
 save_CFLAGS="$CFLAGS"
 CFLAGS="$XORG_CFLAGS"
 AC_CHECK_DECL(XSERVER_LIBPCIACCESS,
