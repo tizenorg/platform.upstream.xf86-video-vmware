@@ -1258,7 +1258,7 @@ vmwareNextXineramaState(VMWAREPtr pVMWARE)
 
             for (i = 0; i < pVMWARE->xineramaNumOutputs; i++) {
                 vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_ID, i);
-                vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_IS_PRIMARY, TRUE);
+                vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_IS_PRIMARY, i == 0);
                 vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_POSITION_X,
                                xineramaState[i].x_org);
                 vmwareWriteReg(pVMWARE, SVGA_REG_DISPLAY_POSITION_Y,
