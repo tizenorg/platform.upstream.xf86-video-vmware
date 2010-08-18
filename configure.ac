@@ -65,7 +65,10 @@ XORG_DRIVER_CHECK_EXT(XV, videoproto)
 
 # Obtain compiler/linker options for the driver dependencies
 PKG_CHECK_MODULES(XORG, [xorg-server >= 1.0.1 xproto fontsproto $REQUIRED_MODULES])
-PKG_CHECK_MODULES(DRM, [libdrm])
+PKG_CHECK_MODULES(LIBDRM,
+		  [libdrm],
+		  [AC_DEFINE([HAVE_LIBDRM], 1, [Has libdrm])],
+		  [echo "Will not try support for 3D or kernel modesetting."])
 
 PKG_CHECK_EXISTS([xorg-server >= 1.1.0],
                  [AC_DEFINE([HAVE_XORG_SERVER_1_1_0], 1,

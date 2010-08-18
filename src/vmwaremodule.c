@@ -25,10 +25,13 @@
 
 #include <xorg-server.h>
 #include <xf86.h>
-#include <xf86drm.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+
+#ifdef HAVE_LIBDRM
+#include <xf86drm.h>
 #endif
 
 /*
@@ -80,6 +83,7 @@ extern XF86ModuleData *VMWGFX_MODULE_DATA;
 static Bool
 vmware_check_kernel_module()
 {
+#ifdef HAVE_LIBDRM
     /* Super simple way of knowing if the kernel driver is loaded */
     int ret = drmOpen(VMWGFX_MODULE_NAME, NULL);
     if (ret < 0) {
@@ -96,11 +100,15 @@ vmware_check_kernel_module()
     drmClose(ret);
 
     return TRUE;
+#else
+    return FALSE;
+#endif /* HAVE_LIBDRM */
 }
 
 static Bool
 vmware_check_vmwgfx_driver(int matched, pointer opts)
 {
+#ifdef HAVE_LIBDRM
     int major; int minor;
     pointer module;
     CARD32 version;
@@ -140,6 +148,7 @@ vmware_check_vmwgfx_driver(int matched, pointer opts)
 
 err:
     /* XXX We should drop the reference on the module here */
+#endif /* HAVE_LIBDRM */
     return FALSE;
 }
 
