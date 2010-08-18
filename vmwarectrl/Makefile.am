@@ -1,8 +1,12 @@
-## Process this file with automake to produce Makefile.in
 
-AUTOMAKE_OPTIONS = dist-bzip2
+if BUILD_VMWARECTRL
 
 bin_PROGRAMS = vmwarectrl
+
+AM_CPPFLAGS = -I$(top_srcdir)/src
+AM_CFLAGS = $(X11_CFLAGS)
+AM_LDFLAGS = $(X11_LIBS)
+
 vmwarectrl_SOURCES = vmwarectrl.c libvmwarectrl.c libvmwarectrl.h
-vmwarectrl_CPPFLAGS = @X11_CFLAGS@ -I../src/
-vmwarectrl_LDADD = @X11_LIBS@
+
+endif BUILD_VMWARECTRL

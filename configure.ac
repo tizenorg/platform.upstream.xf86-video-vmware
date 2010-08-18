@@ -56,6 +56,13 @@ AC_ARG_WITH(xorg-module-dir,
             [moduledir="$withval"],
             [moduledir="$libdir/xorg/modules"])
 
+# Define a configure option to build the vmwarectrl client tool
+AC_ARG_ENABLE(vmwarectrl-client,
+              AS_HELP_STRING([--enable-vmwarectrl-client],
+                             [Enable vmwarectrl client (default: disabled)]),
+                             [VMWARECTRL=$enableval], [VMWARECTRL=no])
+AM_CONDITIONAL(BUILD_VMWARECTRL, [test "x$VMWARECTRL" = xyes])
+
 # Store the list of server defined optional extensions in REQUIRED_MODULES
 XORG_DRIVER_CHECK_EXT(RANDR, randrproto)
 XORG_DRIVER_CHECK_EXT(RENDER, renderproto)
@@ -86,6 +93,9 @@ PKG_CHECK_EXISTS([xorg-server >= 1.7.0],
                  [AC_DEFINE([HAVE_XORG_SERVER_1_7_0], 1,
                  [Has version 1.7.0 or greater of the Xserver])])
 
+# Obtain compiler/linker options for the vmwarectrl client tool
+PKG_CHECK_MODULES(X11, x11 xext)
+
 # Checks for libraries.
 
 save_CFLAGS="$CFLAGS"
@@ -109,6 +119,7 @@ AC_SUBST([DRIVER_NAME])
 AC_CONFIG_FILES([
                 Makefile
                 src/Makefile
+                vmwarectrl/Makefile
                 man/Makefile
 ])
 AC_OUTPUT
