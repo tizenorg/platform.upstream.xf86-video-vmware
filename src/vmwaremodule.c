@@ -152,7 +152,7 @@ err:
     return FALSE;
 }
 
-static void
+static Bool
 vmware_chain_module(pointer opts)
 {
     int vmwlegacy_devices;
@@ -163,6 +163,7 @@ vmware_chain_module(pointer opts)
     GDevPtr *gdevs;
     GDevPtr gdev;
     int i;
+    pointer ret;
 
     vmware_devices = xf86MatchDevice(VMWARE_DRIVER_NAME, &gdevs);
     vmwgfx_devices = xf86MatchDevice(VMWGFX_DRIVER_NAME, NULL);
@@ -189,8 +190,16 @@ vmware_chain_module(pointer opts)
 
     xfree(gdevs);
 
-    if (!matched)
-	xf86LoadOneModule(driver_name, opts);
+    if (!matched) {
+	if (xf86LoadOneModule(driver_name, opts) == NULL) {
+	    xf86DrvMsg(-1, X_ERROR, "%s: Unexpected failure while "
+		       "loading the \"%s\" driver. Giving up.\n",
+		       VMWARE_DRIVER_NAME, driver_name);
+	    return FALSE;
+	}
+    }
+
+    return TRUE;
 }
 
 
@@ -221,9 +230,13 @@ vmware_setup(pointer module, pointer opts, int *errmaj, int *errmin)
 	setupDone = 1;
 
 	/* Chain load the real driver */
-	vmware_chain_module(opts);
-
-	return (pointer) 1;
+	if (vmware_chain_module(opts))
+	    return (pointer) 1;
+	else {
+	    if (errmaj)
+		*errmaj = LDR_NOSUBENT;
+	    return NULL;
+	}
     } else {
 	if (errmaj)
 	    *errmaj = LDR_ONCEONLY;
