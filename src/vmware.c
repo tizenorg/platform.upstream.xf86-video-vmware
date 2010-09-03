@@ -74,6 +74,8 @@ char rcsId_vmware[] =
 #error "PCI_VENDOR_VMWARE is wrong, update it from vm_device_version.h"
 #endif
 
+#define VMWARE_INCHTOMM 25.4
+
 /*
  * This is the only way I know to turn a #define of an integer constant into
  * a constant string.
@@ -1557,7 +1559,6 @@ vmwareIsRegionEqual(const RegionPtr reg1,
     return TRUE;
 }
 
-
 #if VMWARE_DRIVER_FUNC
 static Bool
 VMWareDriverFunc(ScrnInfoPtr pScrn,
@@ -1585,8 +1586,10 @@ VMWareDriverFunc(ScrnInfoPtr pScrn,
        * keep the DPI constant.
        */
       if (modemm && modemm->mode) {
-         modemm->mmWidth *= modemm->mode->HDisplay / (double)(modemm->virtX);
-         modemm->mmHeight *= modemm->mode->VDisplay / (double)(modemm->virtY);
+	  modemm->mmWidth *= (modemm->mode->HDisplay * VMWARE_INCHTOMM +
+			      pScrn->xDpi / 2)  / pScrn->xDpi;
+	  modemm->mmHeight *= (modemm->mode->VDisplay * VMWARE_INCHTOMM +
+			       pScrn->yDpi / 2) / pScrn->yDpi;
       }
       return TRUE;
    default:
@@ -1863,8 +1866,17 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
 static Bool
 VMWARESwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
+
 {
-    return VMWAREModeInit(xf86Screens[scrnIndex], mode, TRUE);
+    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
+    ScreenPtr pScreen = pScrn->pScreen;
+
+    pScreen->mmWidth = (pScreen->width * VMWARE_INCHTOMM +
+			pScrn->xDpi / 2) / pScrn->xDpi;
+    pScreen->mmHeight = (pScreen->height * VMWARE_INCHTOMM +
+			 pScrn->yDpi / 2) / pScrn->yDpi;
+
+    return VMWAREModeInit(pScrn, mode, TRUE);
 }
 
 static Bool
