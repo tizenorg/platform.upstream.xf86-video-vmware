@@ -46,6 +46,11 @@
 
 #include <X11/extensions/Xv.h>
 
+#ifndef HAVE_XORG_SERVER_1_5_0
+#include <xf86_ansic.h>
+#include <xf86_libc.h>
+#endif
+
 #define MAKE_ATOM(a) MakeAtom(a, sizeof(a) - 1, TRUE)
 
 /*
@@ -334,7 +339,7 @@ vmwareOffscreenAllocate(VMWAREPtr pVMWARE, uint32 size)
         return NULL;
     }
 
-    memptr = xalloc(sizeof(VMWAREOffscreenRec));
+    memptr = malloc(sizeof(VMWAREOffscreenRec));
     if (!memptr) {
         return NULL;
     }
@@ -443,7 +448,7 @@ vmwareVideoInit(ScreenPtr pScreen)
         numAdaptors = 1;
         overlayAdaptors = &newAdaptor;
     } else {
-         newAdaptors = xalloc((numAdaptors + 1) *
+         newAdaptors = malloc((numAdaptors + 1) *
                               sizeof(XF86VideoAdaptorPtr*));
          if (!newAdaptors) {
             xf86XVFreeVideoAdaptorRec(newAdaptor);
@@ -463,7 +468,7 @@ vmwareVideoInit(ScreenPtr pScreen)
     }
 
     if (newAdaptors) {
-        xfree(newAdaptors);
+        free(newAdaptors);
     }
 
     xf86DrvMsg(pScrn->scrnIndex, X_INFO,
@@ -545,7 +550,7 @@ vmwareVideoSetup(ScrnInfoPtr pScrn)
         VmwareLog(("Not enough memory\n"));
         return NULL;
     }
-    du = xcalloc(1, VMWARE_VID_NUM_PORTS *
+    du = calloc(1, VMWARE_VID_NUM_PORTS *
         (sizeof(DevUnion) + sizeof(VMWAREVideoRec)));
 
     if (!du) {
@@ -704,7 +709,7 @@ vmwareVideoInitAttributes(ScrnInfoPtr pScrn, VMWAREVideoPtr pVid,
 
     TRACEPOINT
 
-    fmtData = xcalloc(1, sizeof(VMWAREVideoFmtData));
+    fmtData = calloc(1, sizeof(VMWAREVideoFmtData));
     if (!fmtData) {
         return -1;
     }

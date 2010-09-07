@@ -34,6 +34,11 @@
 #include <xf86drm.h>
 #endif
 
+#ifndef HAVE_XORG_SERVER_1_5_0
+#include <xf86_ansic.h>
+#include <xf86_libc.h>
+#endif
+
 /*
  * Defines and exported module info.
  */
@@ -188,7 +193,7 @@ vmware_chain_module(pointer opts)
 	gdev->driver = driver_name;
     }
 
-    xfree(gdevs);
+    free(gdevs);
 
     if (!matched) {
 	if (xf86LoadOneModule(driver_name, opts) == NULL) {

@@ -41,6 +41,11 @@ char rcsId_vmware[] =
 #include "vm_device_version.h"
 #include "svga_modes.h"
 
+#ifndef HAVE_XORG_SERVER_1_5_0
+#include <xf86_ansic.h>
+#include <xf86_libc.h>
+#endif
+
 #ifdef HaveDriverFuncs
 #define VMWARE_DRIVER_FUNC HaveDriverFuncs
 #else
@@ -247,7 +252,7 @@ static void
 VMWAREFreeRec(ScrnInfoPtr pScrn)
 {
     if (pScrn->driverPrivate) {
-        xfree(pScrn->driverPrivate);
+        free(pScrn->driverPrivate);
         pScrn->driverPrivate = NULL;
     }
 }
@@ -560,7 +565,7 @@ VMWAREParseTopologyString(ScrnInfoPtr pScrn,
                  numOutputs, width, height, x, y);
 
       numOutputs++;
-      extents = xrealloc(extents, numOutputs * sizeof (xXineramaScreenInfo));
+      extents = realloc(extents, numOutputs * sizeof (xXineramaScreenInfo));
       extents[numOutputs - 1].x_org = x;
       extents[numOutputs - 1].y_org = y;
       extents[numOutputs - 1].width = width;
@@ -573,7 +578,7 @@ VMWAREParseTopologyString(ScrnInfoPtr pScrn,
  error:
    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Failed.\n");
 
-   xfree(extents);
+   free(extents);
    extents = NULL;
    numOutputs = 0;
 
@@ -877,7 +882,7 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
 #endif
 
     xf86CollectOptions(pScrn, NULL);
-    if (!(options = xalloc(sizeof(VMWAREOptions))))
+    if (!(options = malloc(sizeof(VMWAREOptions))))
         return FALSE;
     memcpy(options, VMWAREOptions, sizeof(VMWAREOptions));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, options);
@@ -909,7 +914,7 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     pScrn->videoRam = pVMWARE->videoRam / 1024;
     pScrn->memPhysBase = pVMWARE->memPhysBase;
 
-    xfree(options);
+    free(options);
 
     {
         Gamma zeros = { 0.0, 0.0, 0.0 };
@@ -922,7 +927,7 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
         /* print error message */
         VMWAREFreeRec(pScrn);
         if (i > 0) {
-            xfree(pciList);
+            free(pciList);
         }
         return FALSE;
     }
@@ -1218,7 +1223,7 @@ vmwareNextXineramaState(VMWAREPtr pVMWARE)
      */
     if (pVMWARE->xinerama && !pVMWARE->xineramaStatic) {
        if (pVMWARE->xineramaNextState) {
-          xfree(pVMWARE->xineramaState);
+          free(pVMWARE->xineramaState);
           pVMWARE->xineramaState = pVMWARE->xineramaNextState;
           pVMWARE->xineramaNumOutputs = pVMWARE->xineramaNextNumOutputs;
 
@@ -1233,14 +1238,14 @@ vmwareNextXineramaState(VMWAREPtr pVMWARE)
            * follow a VMwareCtrlDoSetTopology call.
            */
           VMWAREXineramaPtr basicState =
-             (VMWAREXineramaPtr)xcalloc(1, sizeof (VMWAREXineramaRec));
+             (VMWAREXineramaPtr)calloc(1, sizeof (VMWAREXineramaRec));
           if (basicState) {
              basicState->x_org = 0;
              basicState->y_org = 0;
              basicState->width = vmwareReg->svga_reg_width;
              basicState->height = vmwareReg->svga_reg_height;
 
-             xfree(pVMWARE->xineramaState);
+             free(pVMWARE->xineramaState);
              pVMWARE->xineramaState = basicState;
              pVMWARE->xineramaNumOutputs = 1;
           }
@@ -1488,10 +1493,10 @@ VMWAREAddDisplayMode(ScrnInfoPtr pScrn,
 {
    DisplayModeRec *mode;
 
-   mode = xalloc(sizeof(DisplayModeRec));
+   mode = malloc(sizeof(DisplayModeRec));
    memset(mode, 0, sizeof *mode);
 
-   mode->name = xalloc(strlen(name) + 1);
+   mode->name = malloc(strlen(name) + 1);
    strcpy(mode->name, name);
    mode->status = MODE_OK;
    mode->type = M_T_DEFAULT;
@@ -1614,7 +1619,7 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
 
     xf86CollectOptions(pScrn, NULL);
-    if (!(options = xalloc(sizeof(VMWAREOptions))))
+    if (!(options = malloc(sizeof(VMWAREOptions))))
         return FALSE;
     memcpy(options, VMWAREOptions, sizeof(VMWAREOptions));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, options);
@@ -1639,11 +1644,11 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
          pVMWARE->xineramaStatic = pVMWARE->xineramaState != NULL;
 
-         xfree(topology);
+         free(topology);
        }
     }
 
-    xfree(options);
+    free(options);
 
     /* Initialise VMWARE_CTRL extension. */
     VMwareCtrl_ExtInit(pScrn);
@@ -1993,7 +1998,7 @@ VMWAREProbe(DriverPtr drv, int flags)
         numUsed = xf86MatchPciInstances(VMWARE_NAME, PCI_VENDOR_VMWARE,
                                         VMWAREChipsets, VMWAREPciChipsets, devSections,
                                         numDevSections, drv, &usedChips);
-        xfree(devSections);
+        free(devSections);
         if (numUsed <= 0)
             return FALSE;
         if (flags & PROBE_DETECT)
@@ -2023,7 +2028,7 @@ VMWAREProbe(DriverPtr drv, int flags)
                     foundScreen = TRUE;
                 }
             }
-        xfree(usedChips);
+        free(usedChips);
     }
     return foundScreen;
 }
