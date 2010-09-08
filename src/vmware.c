@@ -1748,12 +1748,9 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     fbPictureInit (pScreen, 0, 0);
 
     /*
-     * Save the old screen vector, then wrap CloseScreen and
-     * set SaveScreen.
+     * Save the old screen vector.
      */
     pVMWARE->ScrnFuncs = *pScreen;
-    pScreen->CloseScreen = VMWARECloseScreen;
-    pScreen->SaveScreen = VMWARESaveScreen;
 
     /*
      * Set initial black & white colourmap indices.
@@ -1864,6 +1861,17 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
         }
     }
 
+    /**
+     * Wrap CloseScreen and SaveScreen. Do this late since we
+     * want to be first in the callchain, to avoid using resources
+     * already taken down in CloseScreen.
+     */
+
+    pVMWARE->ScrnFuncs.CloseScreen = pScreen->CloseScreen;
+    pVMWARE->ScrnFuncs.SaveScreen = pScreen->SaveScreen;
+
+    pScreen->CloseScreen = VMWARECloseScreen;
+    pScreen->SaveScreen = VMWARESaveScreen;
 
     /* Done */
     return TRUE;
