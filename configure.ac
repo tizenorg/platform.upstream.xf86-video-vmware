@@ -89,7 +89,7 @@ PKG_CHECK_EXISTS([xorg-server >= 1.2.0],
                  [AC_DEFINE([HAVE_XORG_SERVER_1_2_0], 1,
                  [Has version 1.2.0 or greater of the Xserver])])
 
-PKG_CHECK_EXISTS([xorg-server >= 1.5.0],
+PKG_CHECK_EXISTS([xorg-server >= 1.4.99],
                  [AC_DEFINE([HAVE_XORG_SERVER_1_5_0], 1,
                  [Has version 1.5.0 or greater of the Xserver])])
 
