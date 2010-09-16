@@ -101,12 +101,21 @@ static const char VMWAREBuildStr[] = "VMware Guest X Server "
 
 /*
  * Standard four digit version string expected by VMware Tools installer.
- * As the driver's version is only  {major, minor, patchlevel}, simply append an
- * extra zero for the fourth digit.
+ * As the driver's version is only  {major, minor, patchlevel},
+ * The fourth digit may describe the commit number relative to the
+ * last version tag as output from `git describe`
  */
+
 #ifdef __GNUC__
-const char vmwlegacy_drv_modinfo[] __attribute__((section(".modinfo"),unused)) =
-    "version=" VMWARE_DRIVER_VERSION_STRING ".0";
+#ifdef VMW_SUBPATCH
+const char vmwlegacy_drv_modinfo[]
+__attribute__((section(".modinfo"),unused)) =
+  "version=" VMWARE_DRIVER_VERSION_STRING "." VMW_STRING(VMW_SUBPATCH);
+#else
+const char vmwlegacy_drv_modinfo[]
+__attribute__((section(".modinfo"),unused)) =
+  "version=" VMWARE_DRIVER_VERSION_STRING ".0";
+#endif /*VMW_SUBPATCH*/
 #endif
 
 static SymTabRec VMWAREChipsets[] = {
