@@ -6,7 +6,6 @@
 char rcsId_vmware[] =
     "Id: vmware.c,v 1.11 2001/02/23 02:10:39 yoel Exp $";
 #endif
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/vmware/vmware.c,v 1.18 2003/09/24 02:43:31 dawes Exp $ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
