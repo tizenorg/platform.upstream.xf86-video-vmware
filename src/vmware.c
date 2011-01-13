@@ -1007,8 +1007,7 @@ VMWAREMapMem(ScrnInfoPtr pScrn)
    err = pci_device_map_range(device,
                               pVMWARE->memPhysBase,
                               pVMWARE->videoRam,
-                              PCI_DEV_MAP_FLAG_WRITABLE | 
-                              PCI_DEV_MAP_FLAG_WRITE_COMBINE,
+                              PCI_DEV_MAP_FLAG_WRITABLE,
                               (void **) &pVMWARE->FbBase);
    if (err) {
        xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
@@ -1018,7 +1017,7 @@ VMWAREMapMem(ScrnInfoPtr pScrn)
    }
 
 #else
-    pVMWARE->FbBase = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_FRAMEBUFFER,
+    pVMWARE->FbBase = xf86MapPciMem(pScrn->scrnIndex, 0,
                                     pVMWARE->PciTag,
                                     pVMWARE->memPhysBase,
                                     pVMWARE->videoRam);
