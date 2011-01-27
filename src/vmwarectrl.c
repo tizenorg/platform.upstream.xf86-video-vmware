@@ -39,6 +39,7 @@
 
 #include "dixstruct.h"
 #include "extnsionst.h"
+#include "randrstr.h"
 #include <X11/X.h>
 #include <X11/extensions/panoramiXproto.h>
 
@@ -300,36 +301,18 @@ VMwareCtrlDoSetTopology(ScrnInfoPtr pScrn,
          if (maxX == pVMWARE->ModeReg.svga_reg_width &&
              maxY == pVMWARE->ModeReg.svga_reg_height) {
 
-            /*
-             * XXX:
-             *
-             * There are problems with trying to set a Xinerama state
-             * without a mode switch. The biggest one is that
-             * applications typically won't notice a topology change
-             * that occurs without a mode switch. If you run "xdpyinfo
-             * -ext XINERAMA" after one such topology change, it will
-             * report the new data, but apps (like the GNOME Panel)
-             * will not notice until the next mode change.
-             *
-             * I don't think there's any good solution to this... as
-             * far as I know, even on a non-virtualized machine
-             * there's no way for an app to find out if the Xinerama
-             * opology changes without a resolution change also
-             * occurring. There might be some cheats we can take, like
-             * swithcing to a new mode with the same resolution and a
-             * different (fake) refresh rate, or temporarily switching
-             * to an intermediate mode. Ick.
-             *
-             * The other annoyance here is that when we reprogram the
-             * SVGA device's monitor topology registers, it may
-             * rearrange those monitors on the host's screen, but they
-             * will still have the old contents. This might be
-             * correct, but it isn't guaranteed to match what's on X's
-             * framebuffer at the moment. So we'll send a
-             * full-framebuffer update rect afterwards.
-             */
+	    /*
+	     * The annoyance here is that when we reprogram the
+	     * SVGA device's monitor topology registers, it may
+	     * rearrange those monitors on the host's screen, but they
+	     * will still have the old contents. This might be
+	     * correct, but it isn't guaranteed to match what's on X's
+	     * framebuffer at the moment. So we'll send a
+	     * full-framebuffer update rect afterwards.
+	     */
 
             vmwareNextXineramaState(pVMWARE);
+            RRSendConfigNotify(pScrn->pScreen);
             vmwareSendSVGACmdUpdateFullScreen(pVMWARE);
 
             return TRUE;
