@@ -42,6 +42,7 @@
 #ifdef HAVE_XORG_SERVER_1_2_0
 #include <xf86Modes.h>
 #endif
+#include "vm_basic_types.h"
 
 #ifndef M_T_DRIVER
 # define M_T_DRIVER  0x40	/* Supplied by the driver (EDID, etc) */
@@ -109,9 +110,13 @@ static DisplayModeRec VMwareModes[] = {
  */
 
 void
-vmwareGetSupportedModelines(DisplayModePtr *monitorModes)
+vmwareGetSupportedModelines(ScrnInfoPtr pScrn, uint32 dwidth, uint32 dheight)
 {
+    MonPtr monitor = pScrn->monitor;
+    DisplayModePtr *monitorModes = &pScrn->monitor->Modes;
     DisplayModePtr modes = NULL, mode = NULL;
+    DisplayModeRec dynamic =
+		{ MODEPREFIX, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, MODESUFFIX };
     int i = 0;
 
     if (monitorModes == NULL || *monitorModes == NULL) {
@@ -122,6 +127,32 @@ vmwareGetSupportedModelines(DisplayModePtr *monitorModes)
     for (i = 0; i < sizeof(VMwareModes)/sizeof(DisplayModeRec); i++) {
        mode = xf86DuplicateMode(&(VMwareModes[i]));
        modes = xf86ModesAdd(modes, mode);
+    }
+
+    /*
+     * Let's add a mode of current SVGA register values and so we can
+     * match against this for subsequent login.
+     */
+    if (dwidth && dheight) {
+	dynamic.HDisplay = dwidth;
+	dynamic.HSyncStart = dynamic.HDisplay + 1;
+	dynamic.HSyncEnd = dynamic.HSyncStart + 1;
+	dynamic.HTotal = dynamic.HSyncEnd * 5 / 4;
+	if (monitor->nHsync > 0)
+	    dynamic.Clock = dynamic.HTotal * monitor->hsync[0].lo;
+	else
+	    dynamic.Clock = 75000;
+	dynamic.VDisplay = dheight;
+	dynamic.VSyncStart = dynamic.VDisplay + 1;
+	dynamic.VSyncEnd = dynamic.VSyncStart + 1;
+	dynamic.VTotal = dynamic.VSyncEnd + 1;
+	if (monitor->nVrefresh > 0)
+	    dynamic.VRefresh = monitor->vrefresh[0].lo;
+	else
+	    dynamic.VRefresh = 60000;
+
+	mode = xf86DuplicateMode(&dynamic);
+	modes = xf86ModesAdd(modes, mode);
     }
 
     *monitorModes = xf86ModesAdd(*monitorModes, modes);

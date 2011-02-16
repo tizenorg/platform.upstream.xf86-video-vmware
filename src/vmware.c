@@ -607,6 +607,7 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     int i;
     ClockRange* clockRanges;
     IOADDRESS domainIOBase = 0;
+    uint32 width = 0, height = 0;
 
 #ifndef BUILD_FOR_420
     domainIOBase = pScrn->domainIOBase;
@@ -950,17 +951,31 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     clockRanges->ClockMulFactor = 1;
     clockRanges->ClockDivFactor = 1;
    
+    /* Read the configured registers for an initial mode.
+     * This gives the benefit that at initial bootup, we're most likely
+     * to have an 800x600 mode and thus we have a reasonable default at
+     * power on. Subsequent logouts will use the pre-configured mode from
+     * last session which is a more natural thing.
+     *
+     * But, only if we haven't any modes specified in the config file.
+     */
+    if (pScrn->display && pScrn->display->modes) {
+	width = vmwareReadReg(pVMWARE, SVGA_REG_WIDTH);
+	height = vmwareReadReg(pVMWARE, SVGA_REG_HEIGHT);
+    }
+
     /*
      * Get the default supported modelines
      */
-    vmwareGetSupportedModelines(&pScrn->monitor->Modes);
+    vmwareGetSupportedModelines(pScrn, width, height);
 
     i = xf86ValidateModes(pScrn, pScrn->monitor->Modes, pScrn->display->modes,
                           clockRanges, NULL, 256, pVMWARE->maxWidth, 32 * 32,
                           128, pVMWARE->maxHeight,
                           pScrn->display->virtualX, pScrn->display->virtualY,
                           pVMWARE->videoRam,
-                          LOOKUP_BEST_REFRESH);
+                          LOOKUP_BEST_REFRESH | LOOKUP_OPTIONAL_TOLERANCES);
+
     if (i == -1) {
         VMWAREFreeRec(pScrn);
         return FALSE;
@@ -972,7 +987,38 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
         return FALSE;
     }
     xf86SetCrtcForModes(pScrn, INTERLACE_HALVE_V);
-    pScrn->currentMode = pScrn->modes;
+
+    /* Walk the mode list and choose one that matches our registers */
+    {
+	DisplayModePtr modes = pScrn->modes;
+	while (modes) {
+	    if (modes->type != M_T_USERDEF) {
+		/* The first mode isn't our specified one, so fallback
+		 * to a sane default so we don't get a large virtual
+		 * screen that may be scaled to a very small initial
+		 * login screen.
+		 * We read the current SVGA registers, so we'll either
+		 * end up with a default 800x600 at bootup, or the last
+		 * virtual autofitted resolution from the previous session.
+		 */
+		width = vmwareReadReg(pVMWARE, SVGA_REG_WIDTH);
+		height = vmwareReadReg(pVMWARE, SVGA_REG_HEIGHT);
+	    }
+
+	    if (modes->HDisplay == width && modes->VDisplay == height)
+		break;
+
+	    modes = modes->next;
+
+	    if (modes == pScrn->modes)
+		break;
+	}
+
+	pScrn->currentMode = modes;
+	pScrn->virtualX = modes->HDisplay;
+	pScrn->virtualY = modes->VDisplay;
+    }
+
     xf86PrintModes(pScrn);
     xf86SetDpi(pScrn, 0, 0);
     if (!xf86LoadSubModule(pScrn, "fb") ||
