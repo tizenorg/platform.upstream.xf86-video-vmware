@@ -35,7 +35,13 @@
  *      supported modelines are manually added in the driver.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "xf86.h"
+#ifdef HAVE_XORG_SERVER_1_2_0
+#include <xf86Modes.h>
+#endif
 
 #ifndef M_T_DRIVER
 # define M_T_DRIVER  0x40	/* Supplied by the driver (EDID, etc) */
