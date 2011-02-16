@@ -312,7 +312,9 @@ VMwareCtrlDoSetTopology(ScrnInfoPtr pScrn,
 	     */
 
             vmwareNextXineramaState(pVMWARE);
+#ifdef HAVE_XORG_SERVER_1_2_0
             RRSendConfigNotify(pScrn->pScreen);
+#endif
             vmwareSendSVGACmdUpdateFullScreen(pVMWARE);
 
             return TRUE;
