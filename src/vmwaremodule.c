@@ -175,7 +175,6 @@ vmware_chain_module(pointer opts)
     GDevPtr *gdevs;
     GDevPtr gdev;
     int i;
-    pointer ret;
 
     vmware_devices = xf86MatchDevice(VMWARE_DRIVER_NAME, &gdevs);
     vmwgfx_devices = xf86MatchDevice(VMWGFX_DRIVER_NAME, NULL);
