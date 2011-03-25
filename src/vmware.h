@@ -313,7 +313,7 @@ void vmwareCheckVideoSanity(
    );
 
 /* vmwaremode.c */
-void vmwareGetSupportedModelines(
+void vmwareAddDefaultMode(
    ScrnInfoPtr pScrn,
    uint32 dwidth,
    uint32 dheight
