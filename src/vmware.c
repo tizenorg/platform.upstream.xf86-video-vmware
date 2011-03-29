@@ -1021,6 +1021,7 @@ VMWAREMapMem(ScrnInfoPtr pScrn)
 #if XSERVER_LIBPCIACCESS
     int err;
     struct pci_device *const device = pVMWARE->PciInfo;
+    void *fbBase;
 #endif
 
 #if XSERVER_LIBPCIACCESS
@@ -1028,14 +1029,14 @@ VMWAREMapMem(ScrnInfoPtr pScrn)
                               pVMWARE->memPhysBase,
                               pVMWARE->videoRam,
                               PCI_DEV_MAP_FLAG_WRITABLE,
-                              (void **) &pVMWARE->FbBase);
+			      &fbBase);
    if (err) {
        xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
                   "Unable to map frame buffer BAR. %s (%d)\n",
                   strerror (err), err);
        return FALSE;
    }
-
+   pVMWARE->FbBase = fbBase;
 #else
     pVMWARE->FbBase = xf86MapPciMem(pScrn->scrnIndex, 0,
                                     pVMWARE->PciTag,
@@ -1336,6 +1337,7 @@ VMWAREInitFIFO(ScrnInfoPtr pScrn)
 #if XSERVER_LIBPCIACCESS
     struct pci_device *const device = pVMWARE->PciInfo;
     int err;
+    void *mmioVirtBase;
 #endif
     CARD32* vmwareFIFO;
     Bool extendedFifo;
@@ -1349,13 +1351,14 @@ VMWAREInitFIFO(ScrnInfoPtr pScrn)
     err = pci_device_map_range(device, pVMWARE->mmioPhysBase,
                                pVMWARE->mmioSize,
                                PCI_DEV_MAP_FLAG_WRITABLE,
-                               (void **) &pVMWARE->mmioVirtBase);
+                               &mmioVirtBase);
     if (err) {
         xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
                    "Unable to map mmio BAR. %s (%d)\n",
                    strerror (err), err);
         return;
     }
+    pVMWARE->mmioVirtBase = mmioVirtBase;
 #else
     pVMWARE->mmioVirtBase = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_MMIO,
                                           pVMWARE->PciTag,
