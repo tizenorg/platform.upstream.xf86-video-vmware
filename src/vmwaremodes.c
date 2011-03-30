@@ -39,6 +39,7 @@
 #include <xf86Modes.h>
 #endif
 #include "vm_basic_types.h"
+#include "vmware.h"
 
 #ifndef M_T_DRIVER
 # define M_T_DRIVER  0x40	/* Supplied by the driver (EDID, etc) */
@@ -85,6 +86,7 @@ vmwareAddDefaultMode(ScrnInfoPtr pScrn, uint32 dwidth, uint32 dheight)
 	char **dispModeList;
 	char *dynModeName;
 	char name[80];
+	VMWAREPtr pVMWARE = VMWAREPTR(pScrn);
 
 	/* First, add the default mode name to the display mode
 	 * requests.
@@ -132,6 +134,20 @@ vmwareAddDefaultMode(ScrnInfoPtr pScrn, uint32 dwidth, uint32 dheight)
 	    dynamic.HTotal / 1000;
 	mode = xf86DuplicateMode(&dynamic);
 	modes = xf86ModesAdd(modes, mode);
+
+	if (dispModeCount == 0) {
+
+	    /*
+	     * We might also want to consider the case where
+	     * dispModeCount != 0, but the requested display modes
+	     * are not available. This is sufficient for now.
+	     */
+
+	    if (pScrn->display->virtualX == 0)
+		pScrn->display->virtualX = pVMWARE->maxWidth;
+	    if (pScrn->display->virtualY == 0)
+		pScrn->display->virtualY = pVMWARE->maxHeight;
+	}
     }
 
     *monitorModes = xf86ModesAdd(*monitorModes, modes);
