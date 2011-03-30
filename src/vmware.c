@@ -1626,10 +1626,10 @@ VMWareDriverFunc(ScrnInfoPtr pScrn,
        * keep the DPI constant.
        */
       if (modemm && modemm->mode) {
-	  modemm->mmWidth *= (modemm->mode->HDisplay * VMWARE_INCHTOMM +
-			      pScrn->xDpi / 2)  / pScrn->xDpi;
-	  modemm->mmHeight *= (modemm->mode->VDisplay * VMWARE_INCHTOMM +
-			       pScrn->yDpi / 2) / pScrn->yDpi;
+	  modemm->mmWidth = (modemm->mode->HDisplay * VMWARE_INCHTOMM +
+			     pScrn->xDpi / 2)  / pScrn->xDpi;
+	  modemm->mmHeight = (modemm->mode->VDisplay * VMWARE_INCHTOMM +
+			      pScrn->yDpi / 2) / pScrn->yDpi;
       }
       return TRUE;
    default:
