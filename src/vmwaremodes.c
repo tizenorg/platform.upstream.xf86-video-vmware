@@ -120,10 +120,6 @@ vmwareAddDefaultMode(ScrnInfoPtr pScrn, uint32 dwidth, uint32 dheight)
 	dynamic.HSyncStart = dynamic.HDisplay + 1;
 	dynamic.HSyncEnd = dynamic.HSyncStart + 1;
 	dynamic.HTotal = dynamic.HSyncEnd * 5 / 4;
-	if (monitor->nHsync > 0)
-	    dynamic.Clock = dynamic.HTotal * monitor->hsync[0].lo;
-	else
-	    dynamic.Clock = 75000;
 	dynamic.VDisplay = dheight;
 	dynamic.VSyncStart = dynamic.VDisplay + 1;
 	dynamic.VSyncEnd = dynamic.VSyncStart + 1;
@@ -131,8 +127,9 @@ vmwareAddDefaultMode(ScrnInfoPtr pScrn, uint32 dwidth, uint32 dheight)
 	if (monitor->nVrefresh > 0)
 	    dynamic.VRefresh = monitor->vrefresh[0].lo;
 	else
-	    dynamic.VRefresh = 60000;
-
+	    dynamic.VRefresh = 60;
+	dynamic.Clock = dynamic.VRefresh * dynamic.VTotal *
+	    dynamic.HTotal / 1000;
 	mode = xf86DuplicateMode(&dynamic);
 	modes = xf86ModesAdd(modes, mode);
     }
