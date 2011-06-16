@@ -121,5 +121,7 @@ AC_CONFIG_FILES([
                 src/Makefile
                 vmwarectrl/Makefile
                 man/Makefile
+		saa/Makefile
+		vmwgfx/Makefile
 ])
 AC_OUTPUT

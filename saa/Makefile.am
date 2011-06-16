@@ -1,0 +1,13 @@
+libsaa_la_LTLIBRARIES = libsaa.la
+libsaa_ladir = @libdir@
+
+libsaa_la_CFLAGS = $(CWARNFLAGS) $(XORG_CFLAGS)
+libsaa_la_SOURCES = \
+	saa.c \
+	saa_pixmap.c \
+	saa_unaccel.c \
+	saa_priv.h \
+	saa_render.c \
+	saa_accel.c \
+	saa.h
+
