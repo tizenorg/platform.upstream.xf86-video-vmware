@@ -410,13 +410,13 @@ vmw_video_port_init(ScrnInfoPtr pScrn, struct vmwgfx_overlay_port *port,
     return port->play(pScrn, port, src_x, src_y, drw_x, drw_y, src_w, src_h,
                       drw_w, drw_h, format, buf, width, height, clipBoxes);
 
-  out_bad_size:
-    (void) vmwgfx_unref_stream(port->drm_fd, port->streamId);
-
   out_no_buffer:
     while(i-- != 0) {
 	vmw_video_buffer_free(&port->bufs[i]);
     }
+  out_bad_size:
+    (void) vmwgfx_unref_stream(port->drm_fd, port->streamId);
+
     return ret;
 }
 

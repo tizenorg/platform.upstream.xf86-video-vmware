@@ -42,14 +42,7 @@
 #include "gc.h"
 #include "vmwgfx_saa.h"
 
-struct vmwgfx_dri2_priv {
-    unsigned int srf_count;
-    struct xa_surface *srf[20];
-};
-
-DevPrivateKeyRec dri2_pixmap_index;
-DevPrivateKeyRec dri2_window_index;
-
+#ifdef DRI2
 typedef struct {
     int refcount;
     PixmapPtr pPixmap;
@@ -322,7 +315,6 @@ dri2_copy_region(DrawablePtr pDraw, RegionPtr pRegion,
     FreeScratchGC(gc);
 }
 
-
 Bool
 xorg_dri2_init(ScreenPtr pScreen)
 {
@@ -337,16 +329,6 @@ xorg_dri2_init(ScreenPtr pScreen)
 	/* Assume version 1.0 */
 	major = 1;
 	minor = 0;
-    }
-
-    if (!dixRegisterPrivateKey(&dri2_pixmap_index, PRIVATE_PIXMAP, 0)) {
-	LogMessage(X_ERROR, "Failed to register vmwgfx dri2 private.\n");
-	return FALSE;
-    }
-
-    if (!dixRegisterPrivateKey(&dri2_window_index, PRIVATE_WINDOW, 0)) {
-	LogMessage(X_ERROR, "Failed to register vmwgfx dri2 private.\n");
-	return FALSE;
     }
 
     dri2info.version = min(DRI2INFOREC_VERSION, 3);
@@ -369,5 +351,6 @@ xorg_dri2_close(ScreenPtr pScreen)
 {
     DRI2CloseScreen(pScreen);
 }
+#endif
 
 /* vim: set sw=4 ts=8 sts=4: */

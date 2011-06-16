@@ -91,7 +91,8 @@ PKG_CHECK_EXISTS([xorg-server >= 1.4.99],
 
 PKG_CHECK_EXISTS([xorg-server >= 1.7.0],
                  [AC_DEFINE([HAVE_XORG_SERVER_1_7_0], 1,
-                 [Has version 1.7.0 or greater of the Xserver])])
+                 [Has version 1.7.0 or greater of the Xserver])
+		 BUILD_VMWGFX=yes],[BUILD_VMWGFX=yes])
 
 # Obtain compiler/linker options for the vmwarectrl client tool
 PKG_CHECK_MODULES(X11, x11 xext)
@@ -113,15 +114,32 @@ AM_CONDITIONAL(XSERVER_LIBPCIACCESS, test "x$XSERVER_LIBPCIACCESS" = xyes)
 
 AC_SUBST([moduledir])
 
+if test x$BUILD_VMWGFX = xyes; then
+	PKG_CHECK_MODULES([XATRACKER], [xatracker >= 0.1.0],[],[BUILD_VMWGFX=no])
+fi
+
 DRIVER_NAME=vmware
 AC_SUBST([DRIVER_NAME])
 
+
+VMWGFX_DIRS=
+if test x$BUILD_VMWGFX = xyes; then
+	VMWGFX_DIRS="vmwgfx saa"
+	AC_CONFIG_FILES([
+			saa/Makefile
+			vmwgfx/Makefile
+	])
+	echo "Will build the vmwgfx driver."
+else
+	echo "Will not build the vmwgfx driver."
+fi
+
+AC_SUBST([VMWGFX_DIRS])
 AC_CONFIG_FILES([
                 Makefile
                 src/Makefile
                 vmwarectrl/Makefile
                 man/Makefile
-		saa/Makefile
-		vmwgfx/Makefile
 ])
+
 AC_OUTPUT

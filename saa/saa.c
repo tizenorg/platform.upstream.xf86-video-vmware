@@ -39,6 +39,7 @@
 #include "dixfontstr.h"
 #include "regionstr.h"
 #include "saa.h"
+#include "saa_priv.h"
 
 #ifdef SAA_DEVPRIVATEKEYREC
 DevPrivateKeyRec saa_screen_index;

@@ -259,10 +259,10 @@ saa_copy_composite(CARD8 op,
 	}
 
 	ret = saa_hw_copy_nton(pSrc->pDrawable, pDst->pDrawable, NULL,
-			       RegionRects(&region),
-			       RegionNumRects(&region),
+			       REGION_RECTS(&region),
+			       REGION_NUM_RECTS(&region),
 			       xSrc - xDst, ySrc - yDst, FALSE, FALSE);
-	RegionUninit(&region);
+	REGION_UNINIT(pDst->pDrwable.pScreen, &region);
 	if (ret)
 	    return TRUE;
     }

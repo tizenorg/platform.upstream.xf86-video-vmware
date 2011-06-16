@@ -30,6 +30,7 @@
 
 #include "saa.h"
 #include "saa_priv.h"
+#include <mi.h>
 
 Bool
 saa_hw_copy_nton(DrawablePtr pSrcDrawable,
@@ -135,7 +136,13 @@ saa_copy_area(DrawablePtr pSrcDrawable, DrawablePtr pDstDrawable, GCPtr pGC,
 				   srcx, srcy, width, height, dstx, dsty);
     }
 
+#if (GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) >= 6)
     return miDoCopy(pSrcDrawable, pDstDrawable, pGC,
 		    srcx, srcy, width, height,
 		    dstx, dsty, saa_copy_nton, 0, NULL);
+#else
+    return fbDoCopy(pSrcDrawable, pDstDrawable, pGC,
+		    srcx, srcy, width, height,
+		    dstx, dsty, saa_copy_nton, 0, NULL);
+#endif
 }

@@ -82,10 +82,11 @@ vmwgfx_pixmap_add_damage(PixmapPtr pixmap)
     box.y1 = 0;
     box.y2 = draw->height;
 
-    if (vpix->hw)
+    if (vpix->hw) {
 	REGION_INIT(draw->pScreen, &spix->dirty_hw, &box, 1);
-    else
+    } else {
 	REGION_INIT(draw->pScreen, &spix->dirty_shadow, &box, 1);
+    }
 
     return TRUE;
 }

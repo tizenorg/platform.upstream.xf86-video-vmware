@@ -181,10 +181,10 @@ saa_gc(GCPtr gc)
 						      &saa_gc_index);
 }
 
-static inline struct saa_pixmap_priv *
+static inline struct saa_pixmap *
 saa_pixmap(PixmapPtr pix)
 {
-    return (struct saa_pixmap_priv *)dixLookupPrivateAddr(&pix->devPrivates,
+    return (struct saa_pixmap *)dixLookupPrivateAddr(&pix->devPrivates,
 							  &saa_pixmap_index);
 }
 

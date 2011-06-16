@@ -457,6 +457,9 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
 #ifdef DRI2
     if (!xf86LoadSubModule(pScrn, "dri2"))
 	return FALSE;
+#else
+    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+	       "Driver compiled without dri2 support."
 #endif
 
     return TRUE;

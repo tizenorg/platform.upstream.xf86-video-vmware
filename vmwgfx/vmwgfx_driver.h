@@ -45,6 +45,13 @@
 #include <xf86xv.h>
 #include <xa_tracker.h>
 
+#ifdef DRI2
+#include <dri2.h>
+#if (!defined(DRI2INFOREC_VERSION) || (DRI2INFOREC_VERSION < 3))
+#undef DRI2
+#endif
+#endif
+
 #define DRV_ERROR(msg)	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, msg);
 #define debug_printf(...)
 
