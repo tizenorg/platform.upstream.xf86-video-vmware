@@ -124,6 +124,7 @@ AC_SUBST([DRIVER_NAME])
 
 VMWGFX_DIRS=
 if test x$BUILD_VMWGFX = xyes; then
+	AC_SYS_LARGEFILE
 	VMWGFX_DIRS="saa vmwgfx"
 	AC_CONFIG_FILES([
 			saa/Makefile
