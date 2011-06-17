@@ -1,7 +1,7 @@
-libsaa_la_LTLIBRARIES = libsaa.la
-libsaa_ladir = @libdir@
+noinst_LTLIBRARIES = libsaa.la
 
 libsaa_la_CFLAGS = $(CWARNFLAGS) $(XORG_CFLAGS)
+libsaa_la_LDFLAGS = -static
 libsaa_la_SOURCES = \
 	saa.c \
 	saa_pixmap.c \

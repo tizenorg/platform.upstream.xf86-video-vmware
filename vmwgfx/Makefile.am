@@ -1,7 +1,7 @@
 vmwgfx_drv_la_LTLIBRARIES = vmwgfx_drv.la
 vmwgfx_drv_la_LDFLAGS = -module -avoid-version
 vmwgfx_drv_la_CFLAGS = $(CWARNFLAGS) $(XORG_CFLAGS) @LIBDRM_CFLAGS@ @XATRACKER_CFLAGS@ -I$(top_srcdir)/src -I$(top_srcdir)/saa
-vmwgfx_drv_la_LIBADD = @LIBDRM_LIBS@ $(top_srcdir)/saa/.libs/libsaa.la\
+vmwgfx_drv_la_LIBADD = @LIBDRM_LIBS@ $(top_srcdir)/saa/libsaa.la\
 	@XATRACKER_LIBS@
 vmwgfx_drv_ladir = @moduledir@/drivers
 
