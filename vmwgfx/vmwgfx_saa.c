@@ -246,7 +246,6 @@ vmwgfx_pixmap_present_readback(struct vmwgfx_saa *vsaa,
     struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
     RegionRec intersection;
 
-
     if (!spix->damage || !REGION_NOTEMPTY(vsaa->pScreen, &spix->dirty_hw) ||
 	!vpix->dirty_present)
 	return TRUE;
@@ -265,6 +264,7 @@ vmwgfx_pixmap_present_readback(struct vmwgfx_saa *vsaa,
     vsaa->present_flush(vsaa->pScreen);
     if (!vmwgfx_pixmap_create_gmr(vsaa, pixmap))
 	goto out_err;
+
 
     /*
      * FIXME: Cliprects may not overlap screen boundaries.
@@ -431,6 +431,8 @@ vmwgfx_create_pixmap(struct saa_driver *driver, struct saa_pixmap *spix,
     *new_pitch = ((w * bpp + FB_MASK) >> FB_SHIFT) * sizeof(FbBits);
 
     WSBMINITLISTHEAD(&vpix->sync_x_head);
+    WSBMINITLISTHEAD(&vpix->scanout_list);
+
     return TRUE;
 }
 
@@ -1126,14 +1128,15 @@ vmwgfx_scanout_refresh(PixmapPtr pixmap)
  */
 
 uint32_t
-vmwgfx_scanout_ref(PixmapPtr pixmap)
+vmwgfx_scanout_ref(struct vmwgfx_screen_box  *box)
 {
+    PixmapPtr pixmap = box->pixmap;
     struct vmwgfx_saa *vsaa =
 	to_vmwgfx_saa(saa_get_driver(pixmap->drawable.pScreen));
     struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(pixmap);
     int ret;
 
-    if (vpix->scanout_refcnt++ == 0) {
+    if (WSBMLISTEMPTY(&vpix->scanout_list)) {
 	ret = !vmwgfx_pixmap_create_gmr(vsaa, pixmap);
 	if (!ret)
 	    ret = !vmwgfx_pixmap_add_present(pixmap);
@@ -1146,14 +1149,17 @@ vmwgfx_scanout_ref(PixmapPtr pixmap)
 			       pixmap->devKind,
 			       vpix->gmr->handle,
 			       &vpix->fb_id);
-	if (!ret) {
-//	    vmwgfx_scanout_refresh(pixmap);
-	}
 	if (ret) {
+	    box->pixmap = NULL;
 	    vpix->fb_id = -1;
-	    --vpix->scanout_refcnt;
+	    goto out_err;
 	}
+
     }
+    pixmap->refcnt += 1;
+    WSBMLISTADDTAIL(&box->scanout_head, &vpix->scanout_list);
+
+  out_err:
     return vpix->fb_id;
 }
 
@@ -1163,17 +1169,20 @@ vmwgfx_scanout_ref(PixmapPtr pixmap)
  * damage tracking and kms fbs.
  */
 void
-vmwgfx_scanout_unref(PixmapPtr pixmap)
+vmwgfx_scanout_unref(struct vmwgfx_screen_box *box)
 {
     struct vmwgfx_saa *vsaa;
     struct vmwgfx_saa_pixmap *vpix;
+    PixmapPtr pixmap = box->pixmap;
 
     if (!pixmap)
 	return;
 
     vsaa = to_vmwgfx_saa(saa_get_driver(pixmap->drawable.pScreen));
     vpix = vmwgfx_saa_pixmap(pixmap);
-    if (--vpix->scanout_refcnt == 0) {
+    WSBMLISTDELINIT(&box->scanout_head);
+
+    if (WSBMLISTEMPTY(&vpix->scanout_list)) {
 	REGION_EMPTY(vsaa->pScreen, vpix->pending_update);
 	drmModeRmFB(vsaa->drm_fd, vpix->fb_id);
 	vpix->fb_id = -1;
@@ -1181,4 +1190,7 @@ vmwgfx_scanout_unref(PixmapPtr pixmap)
 	vmwgfx_pixmap_remove_present(vpix);
 	vmwgfx_pixmap_remove_damage(pixmap);
     }
+
+    box->pixmap = NULL;
+    pixmap->drawable.pScreen->DestroyPixmap(pixmap);
 }

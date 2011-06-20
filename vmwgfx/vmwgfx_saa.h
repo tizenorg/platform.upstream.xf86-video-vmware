@@ -49,10 +49,16 @@ struct vmwgfx_saa_pixmap {
     void *malloc;
     struct vmwgfx_dmabuf *gmr;
     struct xa_surface *hw;
-    int scanout_refcnt;
     uint32_t fb_id;
     int hw_is_dri2_fronts;
     struct _WsbmListHead sync_x_head;
+    struct _WsbmListHead scanout_list;
+};
+
+struct vmwgfx_screen_box {
+    BoxRec box;
+    struct _WsbmListHead scanout_head;
+    PixmapPtr pixmap;
 };
 
 static inline struct vmwgfx_saa_pixmap *
@@ -77,10 +83,10 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
 		void (*present_flush)(ScreenPtr pScreen));
 
 extern uint32_t
-vmwgfx_scanout_ref(PixmapPtr pixmap);
+vmwgfx_scanout_ref(struct vmwgfx_screen_box *box);
 
 extern void
-vmwgfx_scanout_unref(PixmapPtr pixmap);
+vmwgfx_scanout_unref(struct vmwgfx_screen_box *box);
 
 extern void
 vmwgfx_scanout_refresh(PixmapPtr pixmap);
