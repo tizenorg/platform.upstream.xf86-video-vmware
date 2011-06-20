@@ -455,7 +455,7 @@ display_video(ScreenPtr pScreen, struct xorg_xv_port_priv *pPriv, int id,
 
     REGION_NULL(pScreen, &reg);
 
-    if (!vmwgfx_pixmap_validate_hw(pPixmap, &reg, XA_FLAG_RENDER_TARGET, 0))
+    if (!vmwgfx_pixmap_validate_hw(pPixmap, &reg, 0, XA_FLAG_RENDER_TARGET, 0))
 	goto out_no_dst;
 
    hdtv = ((src_w >= RES_720P_X) && (src_h >= RES_720P_Y));

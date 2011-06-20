@@ -63,6 +63,30 @@ to_vmwgfx_saa(struct saa_driver *driver) {
     return (struct vmwgfx_saa *) driver;
 }
 
+static enum xa_formats
+vmwgfx_choose_xa_format(unsigned int depth)
+{
+  /*
+   * For a given depth, choose the same format as the
+   * dri state tracker.
+   */
+
+  switch(depth) {
+  case 32:
+  case 24: /* The dri state tracker never uses 24. */
+      return xa_format_a8r8g8b8;
+  case 16:
+      return xa_format_r5g6b5;
+  case 15: /* No dri. */
+      return xa_format_x1r5g5b5;
+  default:
+      break;
+  }
+
+  return xa_format_unknown;
+}
+
+
 static Bool
 vmwgfx_pixmap_add_damage(PixmapPtr pixmap)
 {
@@ -515,7 +539,8 @@ vmwgfx_destroy_pixmap(struct saa_driver *driver, PixmapPtr pixmap)
 
 static Bool
 vmwgfx_pixmap_create_hw(struct vmwgfx_saa *vsaa,
-			PixmapPtr pixmap, unsigned int flags)
+			PixmapPtr pixmap, unsigned int depth,
+			unsigned int flags)
 {
     struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(pixmap);
     struct xa_surface *hw;
@@ -526,11 +551,15 @@ vmwgfx_pixmap_create_hw(struct vmwgfx_saa *vsaa,
     if (vpix->hw)
 	return TRUE;
 
+    if (!depth)
+	depth = pixmap->drawable.depth;
+
     hw = xa_surface_create(vsaa->xat,
 			   pixmap->drawable.width,
 			   pixmap->drawable.height,
-			   pixmap->drawable.depth,
-			   xa_type_argb, xa_format_unknown,
+			   depth,
+			   xa_type_argb,
+			   vmwgfx_choose_xa_format(depth),
 			   XA_FLAG_RENDER_TARGET | flags);
     if (hw == NULL)
 	return FALSE;
@@ -562,6 +591,7 @@ out_no_damage:
 
 Bool
 vmwgfx_pixmap_validate_hw(PixmapPtr pixmap, RegionPtr region,
+			  unsigned int depth,
 			  unsigned int add_flags,
 			  unsigned int remove_flags)
 {
@@ -575,15 +605,19 @@ vmwgfx_pixmap_validate_hw(PixmapPtr pixmap, RegionPtr region,
 	return FALSE;
 
     if (vpix->hw) {
+	if (!depth)
+	    depth = pixmap->drawable.depth;
+
 	if (xa_surface_redefine(vpix->hw,
 				pixmap->drawable.width,
 				pixmap->drawable.height,
-				pixmap->drawable.depth,
-				xa_type_argb, xa_format_unknown,
+				depth,
+				xa_type_argb,
+				vmwgfx_choose_xa_format(depth),
 				XA_FLAG_RENDER_TARGET | add_flags,
 				remove_flags, 1) != 0)
 	    return FALSE;
-    } else if (!vmwgfx_pixmap_create_hw(vsaa, pixmap, add_flags))
+    } else if (!vmwgfx_pixmap_create_hw(vsaa, pixmap, depth, add_flags))
 	return FALSE;
 
 
@@ -864,7 +898,7 @@ vmwgfx_copy_prepare(struct saa_driver *driver,
 	    return FALSE;
 
 	if (vmwgfx_present_prepare(vsaa, src_vpix, dst_vpix)) {
-	    if (!vmwgfx_pixmap_validate_hw(src_pixmap, src_reg, 0, 0))
+	    if (!vmwgfx_pixmap_validate_hw(src_pixmap, src_reg, 0, 0, 0))
 		return FALSE;
 	    vsaa->present_copy = TRUE;
 	    return TRUE;
@@ -883,9 +917,10 @@ vmwgfx_copy_prepare(struct saa_driver *driver,
 
 	if (!has_dirty_hw && !(has_valid_hw && (dst_vpix->hw != NULL)))
 	    return FALSE;
-	if (!vmwgfx_pixmap_validate_hw(src_pixmap, src_reg, 0, 0))
+	if (!vmwgfx_pixmap_validate_hw(src_pixmap, src_reg, 0, 0, 0))
 	    return FALSE;
-	if (!vmwgfx_pixmap_create_hw(vsaa, dst_pixmap, XA_FLAG_RENDER_TARGET))
+	if (!vmwgfx_pixmap_create_hw(vsaa, dst_pixmap, 0,
+				     XA_FLAG_RENDER_TARGET))
 	    return FALSE;
 
 	if (xa_copy_prepare(vsaa->xa_ctx, dst_vpix->hw, src_vpix->hw) == 0)

@@ -69,6 +69,7 @@ to_vmwgfx_saa_pixmap(struct saa_pixmap *spix)
 
 extern Bool
 vmwgfx_pixmap_validate_hw(PixmapPtr pixmap, RegionPtr region,
+			  unsigned int depth,
 			  unsigned int add_flags,
 			  unsigned int remove_flags);
 

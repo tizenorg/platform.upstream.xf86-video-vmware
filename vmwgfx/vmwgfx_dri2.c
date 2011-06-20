@@ -50,6 +50,32 @@ typedef struct {
     struct xa_surface *srf;
 } *BufferPrivatePtr;
 
+
+/*
+ * Attempt to guess what the dri state tracker is up to.
+ * Currently it sends only bpp as format.
+ */
+
+static unsigned int
+vmwgfx_color_format_to_depth(unsigned int format)
+{
+    return format;
+}
+
+static unsigned int
+vmwgfx_zs_format_to_depth(unsigned int format)
+{
+    if (format == 24)
+	return 32;
+    return format;
+}
+
+static unsigned int
+vmwgfx_z_format_to_depth(unsigned int format)
+{
+    return format;
+}
+
 static Bool
 dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int format)
 {
@@ -60,7 +86,8 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
     PixmapPtr pPixmap;
     struct vmwgfx_saa_pixmap *vpix;
     struct xa_surface *srf = NULL;
-    unsigned int cpp = 4;
+    unsigned int depth;
+
 
     if (pDraw->type == DRAWABLE_PIXMAP)
 	pPixmap = (PixmapPtr) pDraw;
@@ -72,13 +99,16 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
 
     switch (buffer->attachment) {
     default:
+	depth = (format) ? vmwgfx_color_format_to_depth(format) :
+	    pDraw->depth;
+
 	if (buffer->attachment != DRI2BufferFakeFrontLeft ||
 	    &pPixmap->drawable != pDraw) {
 
 	    pPixmap = (*pScreen->CreatePixmap)(pScreen,
 					       pDraw->width,
 					       pDraw->height,
-					       pDraw->depth,
+					       depth,
 					       0);
 	    if (pPixmap == NullPixmap)
 		return FALSE;
@@ -92,10 +122,10 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
 	  break;
       buffer->name = 0;
       buffer->pitch = 0;
-      buffer->cpp = cpp;
+      buffer->cpp = pDraw->bitsPerPixel / 8;
       buffer->driverPrivate = private;
       buffer->flags = 0; /* not tiled */
-      buffer->format = 0;
+      buffer->format = pDraw->bitsPerPixel;
       if (!private->pPixmap) {
 	private->pPixmap = pPixmap;
 	pPixmap->refcnt++;
@@ -103,20 +133,25 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
       return TRUE;
     case DRI2BufferStencil:
     case DRI2BufferDepthStencil:
+
+	depth = (format) ? vmwgfx_zs_format_to_depth(format) : 32;
+
+	/*
+	 * The SVGA device uses the zs ordering.
+	 */
+
 	srf = xa_surface_create(ms->xat, pDraw->width, pDraw->height,
-				32, xa_type_zs, xa_format_unknown,
+				depth, xa_type_zs, xa_format_unknown,
 				XA_FLAG_SHARED );
-	if (!srf)
-	    srf = xa_surface_create(ms->xat, pDraw->width, pDraw->height,
-				    32, xa_type_sz, xa_format_unknown,
-				    XA_FLAG_SHARED );
 	if (!srf)
 	    return FALSE;
 
-	break;
+       break;
     case DRI2BufferDepth:
+	depth = (format) ? vmwgfx_z_format_to_depth(format) :
+	    pDraw->bitsPerPixel;
 	srf = xa_surface_create(ms->xat, pDraw->width, pDraw->height,
-				(format) ? format: pDraw->depth,
+				depth,
 				xa_type_z, xa_format_unknown,
 				XA_FLAG_SHARED);
 	if (!srf)
@@ -130,7 +165,9 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
     }
 
     if (!srf) {
-	if (!vmwgfx_pixmap_validate_hw(pPixmap, NULL,
+	depth = (format) ? vmwgfx_color_format_to_depth(format) :
+	    pDraw->depth;
+	if (!vmwgfx_pixmap_validate_hw(pPixmap, NULL, depth,
 				       XA_FLAG_SHARED | XA_FLAG_RENDER_TARGET,
 				       0))
 	    return FALSE;
@@ -149,7 +186,7 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
     if (xa_surface_handle(srf, &buffer->name, &buffer->pitch) != 0)
 	return FALSE;
 
-    buffer->cpp = cpp;
+    buffer->cpp = xa_format_depth(xa_surface_format(srf)) / 8;
     buffer->driverPrivate = private;
     buffer->flags = 0; /* not tiled */
     buffer->format = format;
@@ -273,6 +310,7 @@ dri2_copy_region(DrawablePtr pDraw, RegionPtr pRegion,
 	    pDestBuffer->attachment == DRI2BufferFakeFrontLeft) {
 	    LogMessage(X_INFO, "dri2 Validate hw.\n");
 	    vmwgfx_pixmap_validate_hw(src_priv->pPixmap, NULL,
+				      0,
 				      XA_FLAG_SHARED | XA_FLAG_RENDER_TARGET,
 				      0);
 	    return;
