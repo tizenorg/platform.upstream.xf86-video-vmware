@@ -573,15 +573,11 @@ void xorg_flush(ScreenPtr pScreen)
 	    if (vpix->pending_update) {
 		(void) vmwgfx_scanout_update(ms->fd, vpix->fb_id,
 					     vpix->pending_update);
-		REGION_SUBTRACT(pScreen, vpix->dirty_present,
-				vpix->dirty_present, vpix->pending_update);
 		REGION_EMPTY(pScreen, vpix->pending_update);
 	    }
 	    if (vpix->pending_present) {
 		(void) vmwgfx_scanout_present(pScreen, ms->fd, vpix,
 					      vpix->pending_present);
-		REGION_SUBTRACT(pScreen, vpix->dirty_present,
-				vpix->dirty_present, vpix->pending_present);
 		REGION_EMPTY(pScreen, vpix->pending_present);
 	    }
 	}

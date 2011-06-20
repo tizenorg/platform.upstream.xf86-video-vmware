@@ -1054,6 +1054,8 @@ vmwgfx_dirty(struct saa_driver *driver, PixmapPtr pixmap,
 	    }
 	    REGION_UNION(vsaa->pScreen, vpix->pending_present,
 			 vpix->pending_present, damage);
+	    REGION_SUBTRACT(vsaa->pScreen, vpix->dirty_present,
+			    vpix->dirty_present, damage);
 	}
     } else {
 	    if (REGION_NOTEMPTY(vsaa->pScreen, vpix->pending_present)) {
@@ -1068,6 +1070,8 @@ vmwgfx_dirty(struct saa_driver *driver, PixmapPtr pixmap,
 	    }
 	    REGION_UNION(vsaa->pScreen, vpix->pending_update,
 			 vpix->pending_update, damage);
+	    REGION_SUBTRACT(vsaa->pScreen, vpix->dirty_present,
+			    vpix->dirty_present, damage);
     }
 
     return TRUE;
