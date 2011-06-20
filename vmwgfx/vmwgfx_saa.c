@@ -55,7 +55,7 @@ struct vmwgfx_saa {
     uint32_t src_handle;
     Bool can_optimize_dma;
     void (*present_flush) (ScreenPtr pScreen);
-    struct vmwgfx_saa_pixmap *dri2_flush_list;
+    struct _WsbmListHead sync_x_list;
 };
 
 static inline struct vmwgfx_saa *
@@ -426,57 +426,31 @@ vmwgfx_create_pixmap(struct saa_driver *driver, struct saa_pixmap *spix,
 		     int w, int h, int depth,
 		     unsigned int usage_hint, int bpp, int *new_pitch)
 {
+    struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
+
     *new_pitch = ((w * bpp + FB_MASK) >> FB_SHIFT) * sizeof(FbBits);
 
-
+    WSBMINITLISTHEAD(&vpix->sync_x_head);
     return TRUE;
 }
-
-
-static void
-vmwgfx_add_dri2_list(struct vmwgfx_saa *vsaa,
-		     struct vmwgfx_saa_pixmap *vpix)
-{
-    vpix->next_dri2 = vsaa->dri2_flush_list;
-    vpix->prevnext_dri2 = &vsaa->dri2_flush_list;
-    vsaa->dri2_flush_list = vpix;
-    if (vpix->next_dri2)
-	vpix->next_dri2->prevnext_dri2 = &vpix->next_dri2;
-}
-
-void
-vmwgfx_remove_dri2_list(struct vmwgfx_saa_pixmap *vpix)
-{
-    if (vpix->next_dri2)
-	vpix->next_dri2->prevnext_dri2 = vpix->prevnext_dri2;
-
-    if (vpix->prevnext_dri2)
-	*vpix->prevnext_dri2  = vpix->next_dri2;
-
-    vpix->next_dri2 = NULL;
-    vpix->prevnext_dri2 = NULL;
-}
-
 
 void
 vmwgfx_flush_dri2(ScreenPtr pScreen)
 {
     struct vmwgfx_saa *vsaa =
 	to_vmwgfx_saa(saa_get_driver(pScreen));
-    struct vmwgfx_saa_pixmap *next = vsaa->dri2_flush_list;
-    struct vmwgfx_saa_pixmap *cur;
+    struct _WsbmListHead *list, *next;
 
-    while(next) {
-	struct saa_pixmap *spix = &next->base;
+    WSBMLISTFOREACHSAFE(list, next, &vsaa->sync_x_list) {
+	struct vmwgfx_saa_pixmap *vpix =
+	    WSBMLISTENTRY(list, struct vmwgfx_saa_pixmap, sync_x_head);
+	struct saa_pixmap *spix = &vpix->base;
 	PixmapPtr pixmap = spix->pixmap;
 
 	if (vmwgfx_upload_to_hw(&vsaa->driver, pixmap, &spix->dirty_shadow)) {
 	    REGION_EMPTY(vsaa->pScreen, &spix->dirty_shadow);
-	    cur = next;
-	    next = next->next_dri2;
-	    vmwgfx_remove_dri2_list(cur);
-	} else
-	    next = next->next_dri2;
+	    WSBMLISTDELINIT(list);
+	}
     }
 }
 
@@ -498,7 +472,7 @@ vmwgfx_destroy_pixmap(struct saa_driver *driver, PixmapPtr pixmap)
      */
 
     vmwgfx_pixmap_remove_present(vpix);
-    vmwgfx_remove_dri2_list(vpix);
+    WSBMLISTDELINIT(&vpix->sync_x_head);
 
     if (vpix->hw_is_dri2_fronts)
 	LogMessage(X_ERROR, "Incorrect dri2 front count.\n");
@@ -996,8 +970,8 @@ vmwgfx_operation_complete(struct saa_driver *driver,
 		return;
 	    REGION_EMPTY(vsaa->pScreen, &spix->dirty_shadow);
 	} else {
-	    if (!vpix->prevnext_dri2)
-		vmwgfx_add_dri2_list(vsaa, vpix);
+	    if (WSBMLISTEMPTY(&vpix->sync_x_head))
+		WSBMLISTADDTAIL(&vpix->sync_x_head, &vsaa->sync_x_list);
 	}
     }
 }
@@ -1102,6 +1076,7 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
     vsaa->drm_fd = drm_fd;
     vsaa->present_flush = present_flush;
     vsaa->can_optimize_dma = FALSE;
+    WSBMINITLISTHEAD(&vsaa->sync_x_list);
 
     vsaa->driver = vmwgfx_saa_driver;
     if (!saa_driver_init(pScreen, &vsaa->driver))

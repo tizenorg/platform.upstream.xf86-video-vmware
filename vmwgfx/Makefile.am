@@ -19,7 +19,8 @@ vmwgfx_drv_la_SOURCES = \
 	vmwgfx_bootstrap.c \
 	vmwgfx_overlay.c \
 	vmwgfx_ctrl.c \
-	vmwgfx_ctrl.h
+	vmwgfx_ctrl.h \
+	wsbm_util.h
 
 
 

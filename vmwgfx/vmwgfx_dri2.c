@@ -41,6 +41,7 @@
 #include "gcstruct.h"
 #include "gc.h"
 #include "vmwgfx_saa.h"
+#include "wsbm_util.h"
 
 #ifdef DRI2
 typedef struct {
@@ -175,7 +176,7 @@ dri2_do_destroy_buffer(DrawablePtr pDraw, DRI2BufferPtr buffer)
     if (private->refcount == 1) {
 	struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(private->pPixmap);
 	if (--vpix->hw_is_dri2_fronts == 0)
-	    vmwgfx_remove_dri2_list(vpix);
+	    WSBMLISTDELINIT(&vpix->sync_x_head);
     }
 
     private->srf = NULL;

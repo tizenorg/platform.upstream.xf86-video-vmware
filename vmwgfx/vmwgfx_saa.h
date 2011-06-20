@@ -31,6 +31,7 @@
 #include "saa.h"
 #include <xa_tracker.h>
 #include "vmwgfx_drmi.h"
+#include "wsbm_util.h"
 
 #define VMWGFX_FLAG_FORCE_GMR     (1 << 0) /* Create with GMR as backing store */
 #define VMWGFX_FLAG_FORCE_SURFACE (1 << 1) /* Create with surface as backing store */
@@ -51,8 +52,7 @@ struct vmwgfx_saa_pixmap {
     int scanout_refcnt;
     uint32_t fb_id;
     int hw_is_dri2_fronts;
-    struct vmwgfx_saa_pixmap *next_dri2;
-    struct vmwgfx_saa_pixmap **prevnext_dri2;
+    struct _WsbmListHead sync_x_head;
 };
 
 static inline struct vmwgfx_saa_pixmap *
