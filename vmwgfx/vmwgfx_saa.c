@@ -245,10 +245,23 @@ vmwgfx_pixmap_present_readback(struct vmwgfx_saa *vsaa,
     struct saa_pixmap *spix = saa_get_saa_pixmap(pixmap);
     struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
     RegionRec intersection;
+    RegionRec screen_intersection;
+    struct _WsbmListHead *list;
 
     if (!spix->damage || !REGION_NOTEMPTY(vsaa->pScreen, &spix->dirty_hw) ||
 	!vpix->dirty_present)
 	return TRUE;
+
+    /*
+     * Flush dirty stuff to screen.
+     */
+
+
+    vsaa->present_flush(vsaa->pScreen);
+
+    /*
+     * Intersect dirty region with region to be read back, if any.
+     */
 
     REGION_NULL(vsaa->pScreen, &intersection);
     REGION_COPY(vsaa->pScreen, &intersection, &spix->dirty_hw);
@@ -261,24 +274,44 @@ vmwgfx_pixmap_present_readback(struct vmwgfx_saa *vsaa,
     if (!REGION_NOTEMPTY(vsaa->pScreen, &intersection))
 	goto out;
 
-    vsaa->present_flush(vsaa->pScreen);
+    /*
+     * Make really sure there is a GMR to read back to.
+     */
+
     if (!vmwgfx_pixmap_create_gmr(vsaa, pixmap))
 	goto out_err;
 
-
     /*
-     * FIXME: Cliprects may not overlap screen boundaries.
+     * Readback regions are not allowed to cross screen boundaries, so
+     * loop over all scanouts and make sure all readback calls are completely
+     * contained within a scanout bounding box.
      */
 
-    if (vmwgfx_present_readback(vsaa->drm_fd, &intersection) != 0)
-	goto out_err;
+    REGION_NULL(vsaa->pScreen, &screen_intersection);
+    WSBMLISTFOREACH(list, &vpix->scanout_list) {
+	struct vmwgfx_screen_box *box =
+	    WSBMLISTENTRY(list, struct vmwgfx_screen_box, scanout_head);
 
-    REGION_SUBTRACT(vsaa->pScreen, &spix->dirty_hw,
-		    &spix->dirty_hw, &intersection);
+	REGION_RESET(vsaa->pScreen, &screen_intersection, &box->box);
+	REGION_INTERSECT(vsaa->pScreen, &screen_intersection,
+			 &screen_intersection, &intersection);
+
+	if (vmwgfx_present_readback(vsaa->drm_fd, &intersection) != 0)
+	    goto out_readback_err;
+
+	REGION_SUBTRACT(vsaa->pScreen, &intersection, &intersection,
+			&screen_intersection);
+	REGION_SUBTRACT(vsaa->pScreen, &spix->dirty_hw,
+			&spix->dirty_hw, &screen_intersection);
+    }
+
+    REGION_UNINIT(vsaa->pScreen, &screen_intersection);
   out:
     REGION_UNINIT(vsaa->pScreen, &intersection);
     return TRUE;
 
+  out_readback_err:
+    REGION_UNINIT(vsaa->pScreen, &screen_intersection);
   out_err:
     REGION_UNINIT(vsaa->pScreen, &intersection);
     return FALSE;
