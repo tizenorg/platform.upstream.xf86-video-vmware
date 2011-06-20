@@ -974,6 +974,7 @@ vmwgfx_copy_done(struct saa_driver *driver)
 
     if (vsaa->present_copy) {
 	vmwgfx_present_done(vsaa);
+	return;
     }
     xa_copy_done(vsaa->xa_ctx);
 }
