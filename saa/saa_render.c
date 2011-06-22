@@ -207,6 +207,80 @@ saa_triangles(CARD8 op, PicturePtr pSrc, PicturePtr pDst,
     }
 }
 
+static Bool
+saa_driver_composite(CARD8		op,
+		     PicturePtr	pSrc,
+		     PicturePtr	pMask,
+		     PicturePtr	pDst,
+		     INT16		xSrc,
+		     INT16		ySrc,
+		     INT16		xMask,
+		     INT16		yMask,
+		     INT16		xDst,
+		     INT16		yDst,
+		     CARD16		width,
+		     CARD16		height,
+		     RegionPtr src_reg,
+		     RegionPtr mask_reg,
+		     RegionPtr dst_reg)
+{
+    struct saa_screen_priv *sscreen = saa_screen(pDst->pDrawable->pScreen);
+    BoxPtr pbox;
+    int nbox;
+    int src_off_x, src_off_y, mask_off_x, mask_off_y, dst_off_x, dst_off_y;
+    PixmapPtr src_pix = NULL, mask_pix = NULL, dst_pix;
+    struct saa_driver *driver = sscreen->driver;
+
+    if (!driver->composite_prepare)
+	return FALSE;
+
+    dst_pix = saa_get_pixmap(pDst->pDrawable, &dst_off_x, &dst_off_y);
+    if (pMask && pMask->pDrawable) {
+	mask_pix = saa_get_pixmap(pMask->pDrawable, &mask_off_x, &mask_off_y);
+    }
+    if (pSrc->pDrawable) {
+	src_pix = saa_get_pixmap(pSrc->pDrawable, &src_off_x, &src_off_y);
+    }
+
+    if (!driver->composite_prepare(driver, op, pSrc, pMask, pDst,
+				   src_pix, mask_pix, dst_pix,
+				   src_reg, mask_reg, dst_reg))
+	return FALSE;
+
+    nbox = REGION_NUM_RECTS(dst_reg);
+    pbox = REGION_RECTS(dst_reg);
+
+    xDst += pDst->pDrawable->x + dst_off_x;
+    yDst += pDst->pDrawable->y + dst_off_y;
+
+    if (src_pix) {
+	xSrc += pSrc->pDrawable->x + src_off_x - xDst;
+	ySrc += pSrc->pDrawable->y + src_off_y - yDst;
+    }
+    if (mask_pix) {
+	xMask += pMask->pDrawable->x + mask_off_x - xDst;
+	yMask += pMask->pDrawable->y + mask_off_y - yDst;
+    }
+
+    while (nbox--) {
+	driver->composite(driver,
+			  pbox->x1 + xSrc,
+			  pbox->y1 + ySrc,
+			  pbox->x1 + xMask,
+			  pbox->y1 + yMask,
+			  pbox->x1,
+			  pbox->y1,
+			  pbox->x2 - pbox->x1,
+			  pbox->y2 - pbox->y1);
+	pbox++;
+    }
+
+    driver->composite_done(driver);
+    saa_pixmap_dirty(dst_pix, TRUE, dst_reg);
+
+    return TRUE;
+}
+
 /*
  * Try to turn a composite operation into an accelerated copy.
  * We can do that in some special cases for PictOpSrc and PictOpOver.
@@ -295,6 +369,10 @@ saa_composite(CARD8 op,
 			   xDst, yDst, width, height, &dst_region))
 	goto out;
 
+    if (saa_driver_composite(op, pSrc, pMask, pDst, xSrc, ySrc, xMask, yMask,
+			     xDst, yDst, width, height, src_region,
+			     mask_region, &dst_region))
+	goto out;
 
     saa_check_composite(op, pSrc, pMask, pDst, xSrc, ySrc, xMask, yMask,
 			xDst, yDst, width, height,
@@ -302,7 +380,7 @@ saa_composite(CARD8 op,
   out:
     if (src_region)
 	REGION_UNINIT(pScreen, src_region);
-    if (mask_region)
+    if (mask_region && mask_region != src_region)
 	REGION_UNINIT(pScreen, mask_region);
     REGION_UNINIT(pScreen, &dst_region);
 }

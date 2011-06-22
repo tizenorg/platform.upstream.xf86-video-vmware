@@ -42,6 +42,7 @@
 #endif
 #include <xf86.h>
 #include <damage.h>
+#include <picturestr.h>
 
 #define SAA_VERSION_MAJOR 0
 #define SAA_VERSION_MINOR 1
@@ -97,15 +98,29 @@ struct saa_driver {
 			   int w, int h, int depth, unsigned int usage_hint,
 			   int bpp, int *new_pitch);
     void (*destroy_pixmap) (struct saa_driver * driver, PixmapPtr pixmap);
-     Bool(*modify_pixmap_header) (PixmapPtr pixmap, int w, int h, int depth,
+    Bool (*modify_pixmap_header) (PixmapPtr pixmap, int w, int h, int depth,
 				  int bpp, int devkind, void *pPixData);
 
-     Bool(*copy_prepare) (struct saa_driver * driver, PixmapPtr src_pixmap,
-			  PixmapPtr dst_pixmap, int dx, int dy, int alu,
-			  RegionPtr scr_reg, uint32_t plane_mask);
+    Bool (*copy_prepare) (struct saa_driver * driver, PixmapPtr src_pixmap,
+			 PixmapPtr dst_pixmap, int dx, int dy, int alu,
+			 RegionPtr scr_reg, uint32_t plane_mask);
     void (*copy) (struct saa_driver * driver, int src_x, int src_y, int dst_x,
 		  int dst_y, int w, int h);
     void (*copy_done) (struct saa_driver * driver);
+    Bool (*composite_prepare) (struct saa_driver *driver, CARD8 op,
+			       PicturePtr src_pict, PicturePtr mask_pict,
+			       PicturePtr dst_pict,
+			       PixmapPtr src_pix, PixmapPtr mask_pix,
+			       PixmapPtr dst_pix,
+			       RegionPtr src_region,
+			       RegionPtr mask_region,
+			       RegionPtr dst_region);
+    void (*composite) (struct saa_driver *driver,
+		       int src_x, int src_y, int mask_x, int mask_y,
+		       int dst_x, int dst_y,
+		       int width, int height);
+    void (*composite_done) (struct saa_driver *driver);
+
     void (*takedown) (struct saa_driver * driver);
     uint32_t pad[16];
 };
