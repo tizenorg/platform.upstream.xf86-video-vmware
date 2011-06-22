@@ -99,7 +99,7 @@ struct saa_screen_priv {
 
     RegionRec srcReg;
     RegionRec maskReg;
-    PixmapPtr srcPix;
+    DrawablePtr srcDraw;
 };
 
 extern GCOps saa_gc_ops;
@@ -228,6 +228,7 @@ saa_render_setup(ScreenPtr pScreen);
 extern void
 saa_render_takedown(ScreenPtr pScreen);
 
+
 extern void
 saa_check_composite(CARD8 op,
 		    PicturePtr pSrc,
@@ -237,7 +238,10 @@ saa_check_composite(CARD8 op,
 		    INT16 ySrc,
 		    INT16 xMask,
 		    INT16 yMask,
-		    INT16 xDst, INT16 yDst, CARD16 width, CARD16 height);
+		    INT16 xDst, INT16 yDst, CARD16 width, CARD16 height,
+		    RegionPtr src_region,
+		    RegionPtr mask_region,
+		    RegionPtr dst_region);
 #endif
 
 extern Bool
@@ -259,5 +263,18 @@ saa_pix_damage_pending(struct saa_pixmap *spix)
 
 extern RegionPtr
 saa_boxes_to_region(ScreenPtr pScreen, int nbox, BoxPtr pbox, int ordering);
+
+
+Bool
+saa_compute_composite_regions(ScreenPtr pScreen,
+			      PicturePtr pSrc,
+			      PicturePtr pMask,
+			      PicturePtr pDst,
+			      INT16 xSrc, INT16 ySrc, INT16 xMask,
+			      INT16 yMask, INT16 xDst,
+			      INT16 yDst, INT16 width, INT16 height,
+			      RegionPtr dst_reg,
+			      RegionPtr *src_reg,
+			      RegionPtr *mask_reg);
 
 #endif

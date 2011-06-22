@@ -221,7 +221,8 @@ saa_copy_composite(CARD8 op,
 		   INT16 ySrc,
 		   INT16 xMask,
 		   INT16 yMask,
-		   INT16 xDst, INT16 yDst, CARD16 width, CARD16 height)
+		   INT16 xDst, INT16 yDst, CARD16 width, CARD16 height,
+		   RegionPtr dst_region)
 {
     if (!pSrc->pDrawable || pSrc->transform ||
 	pSrc->repeat || xSrc < 0 || ySrc < 0 ||
@@ -241,28 +242,27 @@ saa_copy_composite(CARD8 op,
 				       PICT_FORMAT_B(pSrc->format))))) ||
 	(op == PictOpOver && pSrc->format == pDst->format &&
 	 !PICT_FORMAT_A(pSrc->format))) {
-
 	Bool ret;
-	RegionRec region;
+	int xoff, yoff;
 
-	REGION_NULL(pDst->pDrawable.pScreen, &region);
+	saa_get_pixmap(pDst->pDrawable, &xoff, &yoff);
 
 	xDst += pDst->pDrawable->x;
 	yDst += pDst->pDrawable->y;
 	xSrc += pSrc->pDrawable->x;
 	ySrc += pSrc->pDrawable->y;
 
-	if (!miComputeCompositeRegion(&region, pSrc, pMask, pDst,
-				      xSrc, ySrc, xMask, yMask, xDst,
-				      yDst, width, height)) {
-	    return TRUE;
-	}
 
+	/*
+	 * Dst region is in backing pixmap space. We need to
+	 * translate it.
+	 */
+	REGION_TRANSLATE(pScreen, dst_region, -xoff, -yoff);
 	ret = saa_hw_copy_nton(pSrc->pDrawable, pDst->pDrawable, NULL,
-			       REGION_RECTS(&region),
-			       REGION_NUM_RECTS(&region),
+			       REGION_RECTS(dst_region),
+			       REGION_NUM_RECTS(dst_region),
 			       xSrc - xDst, ySrc - yDst, FALSE, FALSE);
-	REGION_UNINIT(pDst->pDrwable.pScreen, &region);
+	REGION_TRANSLATE(pScreen, dst_region, xoff, yoff);
 	if (ret)
 	    return TRUE;
     }
@@ -279,10 +279,32 @@ saa_composite(CARD8 op,
 	      INT16 xMask,
 	      INT16 yMask, INT16 xDst, INT16 yDst, CARD16 width, CARD16 height)
 {
-    if (!saa_copy_composite(op, pSrc, pMask, pDst, xSrc, ySrc, xMask, yMask,
-			    xDst, yDst, width, height))
-	saa_check_composite(op, pSrc, pMask, pDst, xSrc, ySrc, xMask, yMask,
-			    xDst, yDst, width, height);
+    ScreenPtr pScreen = pDst->pDrawable->pScreen;
+    RegionRec dst_region;
+    RegionPtr src_region;
+    RegionPtr mask_region;
+
+    REGION_NULL(pScreen, &dst_region);
+    if (!saa_compute_composite_regions(pScreen, pSrc, pMask, pDst,
+				       xSrc, ySrc, xMask, yMask, xDst,
+				       yDst, width, height,
+				       &dst_region, &src_region, &mask_region))
+	goto out;
+
+    if (saa_copy_composite(op, pSrc, pMask, pDst, xSrc, ySrc, xMask, yMask,
+			   xDst, yDst, width, height, &dst_region))
+	goto out;
+
+
+    saa_check_composite(op, pSrc, pMask, pDst, xSrc, ySrc, xMask, yMask,
+			xDst, yDst, width, height,
+			src_region, mask_region, &dst_region);
+  out:
+    if (src_region)
+	REGION_UNINIT(pScreen, src_region);
+    if (mask_region)
+	REGION_UNINIT(pScreen, mask_region);
+    REGION_UNINIT(pScreen, &dst_region);
 }
 
 void

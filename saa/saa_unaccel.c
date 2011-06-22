@@ -533,20 +533,19 @@ saa_src_validate(DrawablePtr pDrawable, int x, int y, int width, int height)
 {
     ScreenPtr pScreen = pDrawable->pScreen;
     struct saa_screen_priv *sscreen = saa_screen(pScreen);
-    PixmapPtr pPix = saa_get_drawable_pixmap(pDrawable);
+    int xoff, yoff;
     BoxRec box;
     RegionRec reg;
     RegionPtr dst;
-    int xoff, yoff;
 
-    saa_get_drawable_deltas(pDrawable, pPix, &xoff, &yoff);
-
+    (void) saa_get_pixmap(pDrawable, &xoff, &yoff);
     box.x1 = x + xoff;
     box.y1 = y + yoff;
     box.x2 = box.x1 + width;
     box.y2 = box.y1 + height;
 
-    dst = (sscreen->srcPix == pPix) ? &sscreen->srcReg : &sscreen->maskReg;
+    dst = (sscreen->srcDraw == pDrawable) ?
+	&sscreen->srcReg : &sscreen->maskReg;
 
     REGION_INIT(pScreen, &reg, &box, 1);
     REGION_UNION(pScreen, dst, dst, &reg);
@@ -604,46 +603,45 @@ saa_check_get_spans(DrawablePtr pDrawable,
     sscreen->fallback_count--;
 }
 
-static Bool
-saa_prepare_composite_reg(ScreenPtr pScreen,
-			  CARD8 op,
-			  PicturePtr pSrc,
-			  PicturePtr pMask,
-			  PicturePtr pDst,
-			  INT16 xSrc,
-			  INT16 ySrc,
-			  INT16 xMask,
-			  INT16 yMask,
-			  INT16 xDst,
-			  INT16 yDst,
-			  CARD16 width,
-			  CARD16 height,
-			  RegionPtr region, saa_access_t * access)
+/*
+ * Compute composite regions taking transforms into account.
+ * The caller must provide a pointer to an initialized dst_reg,
+ * and the function returns pointers to set up source- and mask regions.
+ * The source and mask regions must be uninitialized after use.
+ */
+
+Bool
+saa_compute_composite_regions(ScreenPtr pScreen,
+			      PicturePtr pSrc,
+			      PicturePtr pMask,
+			      PicturePtr pDst,
+			      INT16 xSrc, INT16 ySrc, INT16 xMask,
+			      INT16 yMask, INT16 xDst,
+			      INT16 yDst, INT16 width, INT16 height,
+			      RegionPtr dst_reg,
+			      RegionPtr *src_reg,
+			      RegionPtr *mask_reg)
 {
-    RegionPtr dstReg = NULL;
+    struct saa_screen_priv *sscreen = saa_screen(pScreen);
+    PixmapPtr dst_pixmap;
     RegionPtr srcReg = NULL;
     RegionPtr maskReg = NULL;
-    PixmapPtr pSrcPix = NULL;
-    PixmapPtr pMaskPix = NULL;
-    PixmapPtr pDstPix;
-    struct saa_screen_priv *sscreen = saa_screen(pScreen);
-    struct saa_pixmap *dst_spix;
     Bool ret;
+    int xoff, yoff;
 
-    *access = SAA_ACCESS_W;
+    *src_reg = NULL;
+    *mask_reg = NULL;
 
     if (pSrc->pDrawable) {
-	pSrcPix = saa_get_drawable_pixmap(pSrc->pDrawable);
 	REGION_NULL(pScreen, &sscreen->srcReg);
 	srcReg = &sscreen->srcReg;
-	sscreen->srcPix = pSrcPix;
+	sscreen->srcDraw = pSrc->pDrawable;
 	if (pSrc != pDst)
 	    REGION_TRANSLATE(pScreen, pSrc->pCompositeClip,
 			     -pSrc->pDrawable->x, -pSrc->pDrawable->y);
     }
 
     if (pMask && pMask->pDrawable) {
-	pMaskPix = saa_get_drawable_pixmap(pMask->pDrawable);
 	REGION_NULL(pScreen, &sscreen->maskReg);
 	maskReg = &sscreen->maskReg;
 	if (pMask != pDst && pMask != pSrc)
@@ -656,7 +654,7 @@ saa_prepare_composite_reg(ScreenPtr pScreen,
 
     sscreen->saved_SourceValidate = saa_src_validate;
     saa_swap(sscreen, pScreen, SourceValidate);
-    ret = miComputeCompositeRegion(region, pSrc, pMask, pDst,
+    ret = miComputeCompositeRegion(dst_reg, pSrc, pMask, pDst,
 				   xSrc, ySrc, xMask, yMask,
 				   xDst, yDst, width, height);
     saa_swap(sscreen, pScreen, SourceValidate);
@@ -679,6 +677,52 @@ saa_prepare_composite_reg(ScreenPtr pScreen,
 	return FALSE;
     }
 
+    *src_reg = srcReg;
+    *mask_reg = maskReg;
+
+    /*
+     * Translate dst region to pixmap space.
+     */
+    dst_pixmap = saa_get_pixmap(pDst->pDrawable, &xoff, &yoff);
+    REGION_TRANSLATE(pScreen, dst_reg, pDst->pDrawable->x + xoff,
+		     pDst->pDrawable->y + yoff);
+
+
+    return TRUE;
+}
+
+static Bool
+saa_prepare_composite_reg(ScreenPtr pScreen,
+			  CARD8 op,
+			  PicturePtr pSrc,
+			  PicturePtr pMask,
+			  PicturePtr pDst,
+			  INT16 xSrc,
+			  INT16 ySrc,
+			  INT16 xMask,
+			  INT16 yMask,
+			  INT16 xDst,
+			  INT16 yDst,
+			  CARD16 width,
+			  CARD16 height,
+			  RegionPtr src_region,
+			  RegionPtr mask_region,
+			  RegionPtr dst_region,
+			  saa_access_t * access)
+{
+    RegionPtr dstReg = NULL;
+    PixmapPtr pSrcPix = NULL;
+    PixmapPtr pMaskPix = NULL;
+    PixmapPtr pDstPix;
+    struct saa_pixmap *dst_spix;
+
+    *access = SAA_ACCESS_W;
+
+    if (pSrc->pDrawable)
+	pSrcPix = saa_get_drawable_pixmap(pSrc->pDrawable);
+    if (pMask && pMask->pDrawable)
+	pMaskPix = saa_get_drawable_pixmap(pMask->pDrawable);
+
     /*
      * Don't limit alphamaps readbacks for now until we've figured out how that
      * should be done.
@@ -691,29 +735,18 @@ saa_prepare_composite_reg(ScreenPtr pScreen,
 	if (!saa_pad_read(pMask->alphaMap->pDrawable))
 	    goto out_no_mask_alpha;
     if (pSrcPix)
-	if (!saa_prepare_access_pixmap(pSrcPix, SAA_ACCESS_R, srcReg))
+	if (!saa_prepare_access_pixmap(pSrcPix, SAA_ACCESS_R, src_region))
 	    goto out_no_src;
     if (pMaskPix)
-	if (!saa_prepare_access_pixmap(pMaskPix, SAA_ACCESS_R, maskReg))
+	if (!saa_prepare_access_pixmap(pMaskPix, SAA_ACCESS_R, mask_region))
 	    goto out_no_mask;
-    if (srcReg)
-	REGION_UNINIT(pScreen, srcReg);
-    if (maskReg)
-	REGION_UNINIT(pScreen, maskReg);
 
     pDstPix = saa_get_drawable_pixmap(pDst->pDrawable);
     dst_spix = saa_get_saa_pixmap(pDstPix);
 
-    if (dst_spix->damage) {
-	int xoff, yoff;
-
-	saa_get_drawable_deltas(pDst->pDrawable, pDstPix, &xoff, &yoff);
-	REGION_TRANSLATE(pScreen, region, pDst->pDrawable->x + xoff,
-			 pDst->pDrawable->y + yoff);
-	if (saa_op_reads_destination(op)) {
-	    dstReg = region;
-	    *access |= SAA_ACCESS_R;
-	}
+    if (dst_spix->damage && saa_op_reads_destination(op)) {
+	dstReg = dst_region;
+	*access |= SAA_ACCESS_R;
     }
 
     if (pDst->alphaMap && pDst->alphaMap->pDrawable)
@@ -749,10 +782,6 @@ saa_prepare_composite_reg(ScreenPtr pScreen,
 	saa_fad_read(pSrc->alphaMap->pDrawable);
  out_no_src_alpha:
     LogMessage(X_ERROR, "No src alpha\n");
-    if (srcReg)
-	REGION_UNINIT(pScreen, srcReg);
-    if (maskReg)
-	REGION_UNINIT(pScreen, maskReg);
     return FALSE;
 
 }
@@ -766,20 +795,25 @@ saa_check_composite(CARD8 op,
 		    INT16 ySrc,
 		    INT16 xMask,
 		    INT16 yMask,
-		    INT16 xDst, INT16 yDst, CARD16 width, CARD16 height)
+		    INT16 xDst, INT16 yDst, CARD16 width, CARD16 height,
+		    RegionPtr src_region,
+		    RegionPtr mask_region,
+		    RegionPtr dst_region)
 {
     ScreenPtr pScreen = pDst->pDrawable->pScreen;
     PictureScreenPtr ps = GetPictureScreen(pScreen);
     struct saa_screen_priv *sscreen = saa_screen(pScreen);
     saa_access_t access;
-    RegionRec reg;
     PixmapPtr pixmap;
 
     sscreen->fallback_count++;
-    REGION_NULL(pScreen, &reg);
     if (!saa_prepare_composite_reg(pScreen, op, pSrc, pMask, pDst, xSrc,
 				   ySrc, xMask, yMask, xDst, yDst, width,
-				   height, &reg, &access)) {
+				   height,
+				   src_region,
+				   mask_region,
+				   dst_region,
+				   &access)) {
 	goto out_no_access;;
     }
 
@@ -795,11 +829,11 @@ saa_check_composite(CARD8 op,
 	saa_fad_read(pSrc->pDrawable);
     pixmap = saa_get_drawable_pixmap(pDst->pDrawable);
     saa_finish_access_pixmap(pixmap, access);
-    saa_pixmap_dirty(pixmap, FALSE, &reg);
+    saa_pixmap_dirty(pixmap, FALSE, dst_region);
     if (pDst->alphaMap && pDst->alphaMap->pDrawable) {
 	pixmap = saa_get_drawable_pixmap(pDst->alphaMap->pDrawable);
 	saa_finish_access_pixmap(pixmap, access);
-	saa_pixmap_dirty(pixmap, FALSE, &reg);
+	saa_pixmap_dirty(pixmap, FALSE, dst_region);
     }
     if (pSrc->alphaMap && pSrc->alphaMap->pDrawable)
 	saa_fad_read(pSrc->alphaMap->pDrawable);
@@ -807,7 +841,6 @@ saa_check_composite(CARD8 op,
 	saa_fad_read(pMask->alphaMap->pDrawable);
  out_no_access:
     sscreen->fallback_count--;
-    REGION_UNINIT(pScreen, &reg);
 }
 
 static void
