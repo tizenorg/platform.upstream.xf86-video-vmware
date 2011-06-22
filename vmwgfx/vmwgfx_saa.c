@@ -33,7 +33,6 @@
 #include "vmwgfx_saa.h"
 #include "vmwgfx_drmi.h"
 
-
 #define VMWGFX_PIX_MALLOC  (1 << 0)
 #define VMWGFX_PIX_GMR     (1 << 1)
 #define VMWGFX_PIX_SURFACE (1 << 2)
@@ -56,6 +55,7 @@ struct vmwgfx_saa {
     Bool can_optimize_dma;
     void (*present_flush) (ScreenPtr pScreen);
     struct _WsbmListHead sync_x_list;
+    struct vmwgfx_composite *vcomp;
 };
 
 static inline struct vmwgfx_saa *
@@ -275,13 +275,6 @@ vmwgfx_pixmap_present_readback(struct vmwgfx_saa *vsaa,
     if (!spix->damage || !REGION_NOTEMPTY(vsaa->pScreen, &spix->dirty_hw) ||
 	!vpix->dirty_present)
 	return TRUE;
-
-    /*
-     * Flush dirty stuff to screen.
-     */
-
-
-    vsaa->present_flush(vsaa->pScreen);
 
     /*
      * Intersect dirty region with region to be read back, if any.
@@ -1014,11 +1007,141 @@ vmwgfx_copy_done(struct saa_driver *driver)
     xa_copy_done(vsaa->xa_ctx);
 }
 
+static Bool
+vmwgfx_composite_prepare(struct saa_driver *driver, CARD8 op,
+			 PicturePtr src_pict, PicturePtr mask_pict,
+			 PicturePtr dst_pict,
+			 PixmapPtr src_pix, PixmapPtr mask_pix,
+			 PixmapPtr dst_pix,
+			 RegionPtr src_region,
+			 RegionPtr mask_region,
+			 RegionPtr dst_region)
+{
+    struct vmwgfx_saa *vsaa = to_vmwgfx_saa(driver);
+    struct vmwgfx_saa_pixmap *src_vpix;
+    struct vmwgfx_saa_pixmap *dst_vpix;
+    struct vmwgfx_saa_pixmap *mask_vpix;
+    Bool tmp_valid_hw;
+    Bool dirty_hw;
+    Bool valid_hw;
+    RegionRec empty;
+    struct xa_composite *xa_comp;
+
+    REGION_NULL(pScreen, &empty);
+
+    /*
+     * First we define our migration policy. We accelerate only if there
+     * is dirty hw regions to be read or if all source data is
+     * available in hw, and the destination has a hardware surface.
+     */
+
+    dst_vpix = vmwgfx_saa_pixmap(dst_pix);
+    valid_hw = (dst_vpix->hw != NULL);
+    if (saa_op_reads_destination(op)) {
+	vmwgfx_check_hw_contents(vsaa, dst_vpix, dst_region,
+				 &dirty_hw, &tmp_valid_hw);
+	valid_hw = (valid_hw && tmp_valid_hw);
+    } else {
+	dirty_hw = FALSE;
+	dst_region = &empty;
+    }
+
+    if (src_pix && !dirty_hw) {
+	src_vpix = vmwgfx_saa_pixmap(src_pix);
+	vmwgfx_check_hw_contents(vsaa, src_vpix, src_region,
+				 &dirty_hw, &tmp_valid_hw);
+	valid_hw = (valid_hw && tmp_valid_hw);
+    }
+
+    if (mask_pict && mask_pix && !dirty_hw) {
+	mask_vpix = vmwgfx_saa_pixmap(mask_pix);
+	vmwgfx_check_hw_contents(vsaa, mask_vpix, mask_region,
+				 &dirty_hw, &tmp_valid_hw);
+	valid_hw = (valid_hw && tmp_valid_hw);
+    }
+
+    if (!valid_hw && !dirty_hw)
+	goto out_err;
+
+    /*
+     * Then, setup most of the XA composite state (except hardware surfaces)
+     * and check whether XA can accelerate.
+     */
+
+    xa_comp = vmwgfx_xa_setup_comp(vsaa->vcomp, op,
+				   src_pict, mask_pict, dst_pict);
+    if (!xa_comp)
+	goto out_err;
+
+    if (xa_composite_check_accelerated(xa_comp) != XA_ERR_NONE)
+	goto out_err;
+
+    /*
+     * Create hw surfaces and migrate data needed for HW compositing.
+     */
+
+    if (src_region == NULL)
+	src_region = &empty;
+    if (src_pix &&
+	!vmwgfx_pixmap_validate_hw(src_pix, src_region, 0, 0, 0))
+	goto out_err;
+
+    if (mask_region == NULL)
+	mask_region = &empty;
+    if (mask_pict && mask_pix &&
+	!vmwgfx_pixmap_validate_hw(mask_pix, mask_region, 0, 0, 0))
+	goto out_err;
+
+    if (dst_region == NULL)
+	dst_region = &empty;
+    if (!vmwgfx_pixmap_validate_hw(dst_pix, dst_region, 0, 0, 0))
+	goto out_err;
+
+    /*
+     * Update the XA state with our hardware surfaces and
+     * surface formats, and bind the XA state for compositing.
+     */
+
+    if (!vmwgfx_xa_update_comp(xa_comp, src_pix, mask_pix, dst_pix))
+	goto out_err;
+
+    if (xa_composite_prepare(vsaa->xa_ctx, xa_comp))
+	goto out_err;
+
+    REGION_UNINIT(pScreen, &empty);
+    return TRUE;
+ out_err:
+    REGION_UNINIT(pScreen, &empty);
+    return FALSE;
+}
+
+static void
+vmwgfx_composite(struct saa_driver *driver,
+		 int src_x, int src_y, int mask_x, int mask_y,
+		 int dst_x, int dst_y,
+		 int width, int height)
+{
+    struct vmwgfx_saa *vsaa = to_vmwgfx_saa(driver);
+
+    xa_composite_rect(vsaa->xa_ctx, src_x, src_y, mask_x, mask_y,
+		      dst_x, dst_y, width, height);
+}
+
+static void
+vmwgfx_composite_done(struct saa_driver *driver)
+{
+   struct vmwgfx_saa *vsaa = to_vmwgfx_saa(driver);
+
+   xa_composite_done(vsaa->xa_ctx);
+}
+
 static void
 vmwgfx_takedown(struct saa_driver *driver)
 {
     struct vmwgfx_saa *vsaa = to_vmwgfx_saa(driver);
 
+    if (vsaa->vcomp)
+	vmwgfx_free_composite(vsaa->vcomp);
     free(vsaa);
 }
 
@@ -1130,6 +1253,9 @@ static const struct saa_driver vmwgfx_saa_driver = {
     .copy_prepare = vmwgfx_copy_prepare,
     .copy = vmwgfx_copy,
     .copy_done = vmwgfx_copy_done,
+    .composite_prepare = vmwgfx_composite_prepare,
+    .composite = vmwgfx_composite,
+    .composite_done = vmwgfx_composite_done,
     .takedown = vmwgfx_takedown,
 };
 
@@ -1154,6 +1280,11 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
     WSBMINITLISTHEAD(&vsaa->sync_x_list);
 
     vsaa->driver = vmwgfx_saa_driver;
+    vsaa->vcomp = vmwgfx_alloc_composite();
+
+    if (!vsaa->vcomp)
+	vsaa->driver.composite_prepare = NULL;
+
     if (!saa_driver_init(pScreen, &vsaa->driver))
 	goto out_no_saa;
 

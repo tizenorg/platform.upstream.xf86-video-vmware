@@ -29,9 +29,10 @@
 #define _VMWGFX_SAA_H_
 
 #include "saa.h"
-#include <xa_tracker.h>
+#include <xa_composite.h>
 #include "vmwgfx_drmi.h"
 #include "wsbm_util.h"
+
 
 #define VMWGFX_FLAG_FORCE_GMR     (1 << 0) /* Create with GMR as backing store */
 #define VMWGFX_FLAG_FORCE_SURFACE (1 << 1) /* Create with surface as backing store */
@@ -97,5 +98,29 @@ vmwgfx_remove_dri2_list(struct vmwgfx_saa_pixmap *vpix);
 
 extern void
 vmwgfx_flush_dri2(ScreenPtr pScreen);
+
+/*
+ * vmwgfx_xa_composite.c
+ */
+
+struct vmwgfx_composite;
+
+void
+vmwgfx_free_composite(struct vmwgfx_composite *vcomp);
+struct vmwgfx_composite *
+vmwgfx_alloc_composite(void);
+
+Bool
+vmwgfx_xa_update_comp(struct xa_composite *comp,
+		      PixmapPtr src_pix,
+		      PixmapPtr mask_pix,
+		      PixmapPtr dst_pix);
+
+struct xa_composite *
+vmwgfx_xa_setup_comp(struct vmwgfx_composite *vcomp,
+		     int op,
+		     PicturePtr src_pict,
+		     PicturePtr mask_pict,
+		     PicturePtr dst_pict);
 
 #endif

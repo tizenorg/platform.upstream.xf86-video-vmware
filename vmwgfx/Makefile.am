@@ -20,6 +20,7 @@ vmwgfx_drv_la_SOURCES = \
 	vmwgfx_overlay.c \
 	vmwgfx_ctrl.c \
 	vmwgfx_ctrl.h \
+	vmwgfx_xa_composite.c \
 	wsbm_util.h
 
 
