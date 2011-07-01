@@ -54,6 +54,11 @@ struct vmwgfx_saa_pixmap {
     int hw_is_dri2_fronts;
     struct _WsbmListHead sync_x_head;
     struct _WsbmListHead scanout_list;
+
+    uint32_t xa_flags;
+    uint32_t staging_add_flags;
+    uint32_t staging_remove_flags;
+    enum xa_formats staging_format;
 };
 
 struct vmwgfx_screen_box {
@@ -67,12 +72,6 @@ to_vmwgfx_saa_pixmap(struct saa_pixmap *spix)
 {
     return (struct vmwgfx_saa_pixmap *) spix;
 }
-
-extern Bool
-vmwgfx_pixmap_validate_hw(PixmapPtr pixmap, RegionPtr region,
-			  unsigned int depth,
-			  unsigned int add_flags,
-			  unsigned int remove_flags);
 
 static inline struct vmwgfx_saa_pixmap*
 vmwgfx_saa_pixmap(PixmapPtr pix)
@@ -99,28 +98,11 @@ vmwgfx_remove_dri2_list(struct vmwgfx_saa_pixmap *vpix);
 extern void
 vmwgfx_flush_dri2(ScreenPtr pScreen);
 
-/*
- * vmwgfx_xa_composite.c
- */
-
-struct vmwgfx_composite;
-
-void
-vmwgfx_free_composite(struct vmwgfx_composite *vcomp);
-struct vmwgfx_composite *
-vmwgfx_alloc_composite(void);
+extern Bool
+vmwgfx_hw_dri2_validate(PixmapPtr pixmap, unsigned int depth);
 
 Bool
-vmwgfx_xa_update_comp(struct xa_composite *comp,
-		      PixmapPtr src_pix,
-		      PixmapPtr mask_pix,
-		      PixmapPtr dst_pix);
-
-struct xa_composite *
-vmwgfx_xa_setup_comp(struct vmwgfx_composite *vcomp,
-		     int op,
-		     PicturePtr src_pict,
-		     PicturePtr mask_pict,
-		     PicturePtr dst_pict);
-
+vmwgfx_hw_accel_validate(PixmapPtr pixmap, unsigned int depth,
+			 uint32_t add_flags, uint32_t remove_flags,
+			 RegionPtr region);
 #endif

@@ -32,60 +32,7 @@
 #include <xa_context.h>
 #include "vmwgfx_saa.h"
 #include "vmwgfx_drmi.h"
-
-#define VMWGFX_PIX_MALLOC  (1 << 0)
-#define VMWGFX_PIX_GMR     (1 << 1)
-#define VMWGFX_PIX_SURFACE (1 << 2)
-
-struct vmwgfx_saa {
-    struct saa_driver driver;
-    struct vmwgfx_dma_ctx *ctx;
-    struct xa_tracker *xat;
-    struct xa_context *xa_ctx;
-    ScreenPtr pScreen;
-    int drm_fd;
-    struct vmwgfx_saa_pixmap *src_vpix;
-    struct vmwgfx_saa_pixmap *dst_vpix;
-    Bool present_copy;
-    Bool diff_valid;
-    int xdiff;
-    int ydiff;
-    RegionRec present_region;
-    uint32_t src_handle;
-    Bool can_optimize_dma;
-    void (*present_flush) (ScreenPtr pScreen);
-    struct _WsbmListHead sync_x_list;
-    struct vmwgfx_composite *vcomp;
-};
-
-static inline struct vmwgfx_saa *
-to_vmwgfx_saa(struct saa_driver *driver) {
-    return (struct vmwgfx_saa *) driver;
-}
-
-static enum xa_formats
-vmwgfx_choose_xa_format(unsigned int depth)
-{
-  /*
-   * For a given depth, choose the same format as the
-   * dri state tracker.
-   */
-
-  switch(depth) {
-  case 32:
-  case 24: /* The dri state tracker never uses 24. */
-      return xa_format_a8r8g8b8;
-  case 16:
-      return xa_format_r5g6b5;
-  case 15: /* No dri. */
-      return xa_format_x1r5g5b5;
-  default:
-      break;
-  }
-
-  return xa_format_unknown;
-}
-
+#include "vmwgfx_saa_priv.h"
 
 static Bool
 vmwgfx_pixmap_add_damage(PixmapPtr pixmap)
@@ -486,6 +433,33 @@ vmwgfx_create_pixmap(struct saa_driver *driver, struct saa_pixmap *spix,
     return TRUE;
 }
 
+Bool
+vmwgfx_hw_kill(struct vmwgfx_saa *vsaa,
+	       struct saa_pixmap *spix)
+{
+    struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
+
+    /*
+     * Read back any dirty regions from hardware.
+     */
+
+    if (!vmwgfx_download_from_hw(&vsaa->driver, spix->pixmap,
+				 &spix->dirty_hw))
+	return FALSE;
+
+    xa_surface_destroy(vpix->hw);
+    vpix->hw = NULL;
+
+    /*
+     * Remove damage tracking if this is not a scanout pixmap.
+     */
+
+    if (WSBMLISTEMPTY(&vpix->scanout_list))
+	vmwgfx_pixmap_remove_damage(spix->pixmap);
+
+    return TRUE;
+}
+
 void
 vmwgfx_flush_dri2(ScreenPtr pScreen)
 {
@@ -530,130 +504,12 @@ vmwgfx_destroy_pixmap(struct saa_driver *driver, PixmapPtr pixmap)
 	LogMessage(X_ERROR, "Incorrect dri2 front count.\n");
 }
 
-static Bool
-vmwgfx_pixmap_create_hw(struct vmwgfx_saa *vsaa,
-			PixmapPtr pixmap, unsigned int depth,
-			unsigned int flags)
-{
-    struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(pixmap);
-    struct xa_surface *hw;
-
-    if (!vsaa->xat)
-	return FALSE;
-
-    if (vpix->hw)
-	return TRUE;
-
-    if (!depth)
-	depth = pixmap->drawable.depth;
-
-    hw = xa_surface_create(vsaa->xat,
-			   pixmap->drawable.width,
-			   pixmap->drawable.height,
-			   depth,
-			   xa_type_argb,
-			   vmwgfx_choose_xa_format(depth),
-			   XA_FLAG_RENDER_TARGET | flags);
-    if (hw == NULL)
-	return FALSE;
-
-    if ((vpix->gmr || vpix->malloc) && !vmwgfx_pixmap_add_damage(pixmap))
-	goto out_no_damage;
-
-    /*
-     * Even if we don't have a GMR yet, indicate that when needed it
-     * should be created.
-     */
-
-    vpix->hw = hw;
-    vpix->backing |= VMWGFX_PIX_SURFACE;
-    vmwgfx_pixmap_free_storage(vpix);
-
-    return TRUE;
-
-out_no_damage:
-    xa_surface_destroy(hw);
-    return FALSE;
-}
 
 
 /**
  *
  * Makes sure we have a surface with valid contents.
  */
-
-Bool
-vmwgfx_pixmap_validate_hw(PixmapPtr pixmap, RegionPtr region,
-			  unsigned int depth,
-			  unsigned int add_flags,
-			  unsigned int remove_flags)
-{
-    struct vmwgfx_saa *vsaa =
-	to_vmwgfx_saa(saa_get_driver(pixmap->drawable.pScreen));
-    struct saa_pixmap *spix = saa_get_saa_pixmap(pixmap);
-    struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
-    RegionRec intersection;
-
-    if (!vsaa->xat)
-	return FALSE;
-
-    if (vpix->hw) {
-	if (!depth)
-	    depth = pixmap->drawable.depth;
-
-	if (xa_surface_redefine(vpix->hw,
-				pixmap->drawable.width,
-				pixmap->drawable.height,
-				depth,
-				xa_type_argb,
-				vmwgfx_choose_xa_format(depth),
-				XA_FLAG_RENDER_TARGET | add_flags,
-				remove_flags, 1) != 0)
-	    return FALSE;
-    } else if (!vmwgfx_pixmap_create_hw(vsaa, pixmap, depth, add_flags))
-	return FALSE;
-
-
-    if (!vmwgfx_pixmap_present_readback(vsaa, pixmap, region))
-	return FALSE;
-
-    REGION_NULL(vsaa->pScreen, &intersection);
-    REGION_COPY(vsaa->pScreen, &intersection, &spix->dirty_shadow);
-
-    if (vpix->dirty_present)
-	REGION_UNION(vsaa->pScreen, &intersection, vpix->dirty_present,
-		     &spix->dirty_shadow);
-
-    if (spix->damage && REGION_NOTEMPTY(vsaa->pScreen, &intersection)) {
-	RegionPtr upload = &intersection;
-
-	/*
-	 * Check whether we need to upload from GMR.
-	 */
-
-	if (region) {
-	    REGION_INTERSECT(vsaa->pScreen, &intersection, region,
-			     &intersection);
-	    upload = &intersection;
-	}
-
-	if (REGION_NOTEMPTY(vsaa->pScreen, upload)) {
-	    Bool ret = vmwgfx_upload_to_hw(&vsaa->driver, pixmap, upload);
-	    if (ret) {
-		REGION_SUBTRACT(vsaa->pScreen, &spix->dirty_shadow,
-				&spix->dirty_shadow, upload);
-		if (vpix->dirty_present)
-		    REGION_SUBTRACT(vsaa->pScreen, vpix->dirty_present,
-				    vpix->dirty_present, upload);
-	    } else {
-		REGION_UNINIT(vsaa->pScreen, &intersection);
-		return FALSE;
-	    }
-	}
-    }
-    REGION_UNINIT(vsaa->pScreen, &intersection);
-    return TRUE;
-}
 
 static void
 vmwgfx_copy_stride(uint8_t *dst, uint8_t *src, unsigned int dst_pitch,
@@ -730,7 +586,7 @@ vmwgfx_pix_resize(PixmapPtr pixmap, unsigned int old_pitch,
     if (vpix->hw) {
 	if (xa_surface_redefine(vpix->hw, draw->width, draw->height,
 				draw->depth, xa_type_argb,
-				xa_format_unknown, 0, 0, 1) != 0)
+				xa_format_unknown, vpix->xa_flags, 1) != 0)
 	    return FALSE;
     }
     return TRUE;
@@ -858,6 +714,106 @@ vmwgfx_check_hw_contents(struct vmwgfx_saa *vsaa,
     REGION_UNINIT(vsaa->pScreen, &intersection);
 }
 
+
+Bool
+vmwgfx_create_hw(struct vmwgfx_saa *vsaa,
+		 PixmapPtr pixmap)
+{
+    struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(pixmap);
+    struct xa_surface *hw;
+    uint32_t new_flags;
+
+    if (!vsaa->xat)
+	return FALSE;
+
+    if (vpix->hw)
+	return TRUE;
+
+    new_flags = (vpix->xa_flags & ~vpix->staging_remove_flags) |
+	vpix->staging_add_flags;
+
+    hw = xa_surface_create(vsaa->xat,
+			   pixmap->drawable.width,
+			   pixmap->drawable.height,
+			   0,
+			   xa_type_other,
+			   vpix->staging_format,
+			   new_flags);
+    if (hw == NULL)
+	return FALSE;
+
+    vpix->xa_flags = new_flags;
+
+    if ((vpix->gmr || vpix->malloc) && !vmwgfx_pixmap_add_damage(pixmap))
+	goto out_no_damage;
+
+    /*
+     * Even if we don't have a GMR yet, indicate that when needed it
+     * should be created.
+     */
+
+    vpix->hw = hw;
+    vpix->backing |= VMWGFX_PIX_SURFACE;
+    vmwgfx_pixmap_free_storage(vpix);
+
+    return TRUE;
+
+out_no_damage:
+    xa_surface_destroy(hw);
+    return FALSE;
+}
+
+
+Bool
+vmwgfx_hw_validate(PixmapPtr pixmap, RegionPtr region)
+{
+    struct vmwgfx_saa *vsaa =
+	to_vmwgfx_saa(saa_get_driver(pixmap->drawable.pScreen));
+    struct saa_pixmap *spix = saa_get_saa_pixmap(pixmap);
+    struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
+    RegionRec intersection;
+
+    if (!vmwgfx_pixmap_present_readback(vsaa, pixmap, region))
+	return FALSE;
+
+    REGION_NULL(vsaa->pScreen, &intersection);
+    REGION_COPY(vsaa->pScreen, &intersection, &spix->dirty_shadow);
+
+    if (vpix->dirty_present)
+	REGION_UNION(vsaa->pScreen, &intersection, vpix->dirty_present,
+		     &spix->dirty_shadow);
+
+    if (spix->damage && REGION_NOTEMPTY(vsaa->pScreen, &intersection)) {
+	RegionPtr upload = &intersection;
+
+	/*
+	 * Check whether we need to upload from GMR.
+	 */
+
+	if (region) {
+	    REGION_INTERSECT(vsaa->pScreen, &intersection, region,
+			     &intersection);
+	    upload = &intersection;
+	}
+
+	if (REGION_NOTEMPTY(vsaa->pScreen, upload)) {
+	    Bool ret = vmwgfx_upload_to_hw(&vsaa->driver, pixmap, upload);
+	    if (ret) {
+		REGION_SUBTRACT(vsaa->pScreen, &spix->dirty_shadow,
+				&spix->dirty_shadow, upload);
+		if (vpix->dirty_present)
+		    REGION_SUBTRACT(vsaa->pScreen, vpix->dirty_present,
+				    vpix->dirty_present, upload);
+	    } else {
+		REGION_UNINIT(vsaa->pScreen, &intersection);
+		return FALSE;
+	    }
+	}
+    }
+    REGION_UNINIT(vsaa->pScreen, &intersection);
+    return TRUE;
+}
+
 static Bool
 vmwgfx_copy_prepare(struct saa_driver *driver,
 		    PixmapPtr src_pixmap,
@@ -891,7 +847,7 @@ vmwgfx_copy_prepare(struct saa_driver *driver,
 	    return FALSE;
 
 	if (vmwgfx_present_prepare(vsaa, src_vpix, dst_vpix)) {
-	    if (!vmwgfx_pixmap_validate_hw(src_pixmap, src_reg, 0, 0, 0))
+	  if (!vmwgfx_hw_accel_validate(src_pixmap, 0, 0, 0, src_reg))
 		return FALSE;
 	    vsaa->present_copy = TRUE;
 	    return TRUE;
@@ -900,7 +856,7 @@ vmwgfx_copy_prepare(struct saa_driver *driver,
     }
 
     vsaa->present_copy = FALSE;
-    if (src_vpix->hw != NULL && src_vpix != dst_vpix) {
+    if (src_vpix != dst_vpix) {
 
 	/*
 	 * Use hardware acceleration either if source is partially only
@@ -910,14 +866,43 @@ vmwgfx_copy_prepare(struct saa_driver *driver,
 
 	if (!has_dirty_hw && !(has_valid_hw && (dst_vpix->hw != NULL)))
 	    return FALSE;
-	if (!vmwgfx_pixmap_validate_hw(src_pixmap, src_reg, 0, 0, 0))
+
+	/*
+	 * Determine surface formats.
+	 */
+
+	if (!vmwgfx_hw_accel_stage(src_pixmap, 0, XA_FLAG_RENDER_TARGET, 0))
 	    return FALSE;
-	if (!vmwgfx_pixmap_create_hw(vsaa, dst_pixmap, 0,
-				     XA_FLAG_RENDER_TARGET))
+	if (!vmwgfx_hw_accel_stage(dst_pixmap, 0, XA_FLAG_RENDER_TARGET, 0))
 	    return FALSE;
 
-	if (xa_copy_prepare(vsaa->xa_ctx, dst_vpix->hw, src_vpix->hw) == 0)
-	    return TRUE;
+	/*
+	 * Create hardware surfaces.
+	 */
+
+	if (!vmwgfx_hw_commit(src_pixmap))
+	    return FALSE;
+	if (!vmwgfx_hw_commit(dst_pixmap))
+	    return FALSE;
+
+	/*
+	 * Setup copy state.
+	 */
+
+	if (xa_copy_prepare(vsaa->xa_ctx, dst_vpix->hw, src_vpix->hw) !=
+	    XA_ERR_NONE)
+	    return FALSE;
+
+	/*
+	 * Migrate data.
+	 */
+
+	if (!vmwgfx_hw_validate(src_pixmap, src_reg)) {
+	    xa_copy_done(vsaa->xa_ctx);
+	    return FALSE;
+	}
+
+	return TRUE;
     }
 
     return FALSE;
@@ -1077,24 +1062,26 @@ vmwgfx_composite_prepare(struct saa_driver *driver, CARD8 op,
 	goto out_err;
 
     /*
-     * Create hw surfaces and migrate data needed for HW compositing.
+     * Check that we can create the needed hardware surfaces.
      */
 
-    if (src_region == NULL)
-	src_region = &empty;
-    if (src_pix &&
-	!vmwgfx_pixmap_validate_hw(src_pix, src_region, 0, 0, 0))
+    if (src_pix && !vmwgfx_hw_composite_src_stage(src_pix, src_pict->format))
 	goto out_err;
-
-    if (mask_region == NULL)
-	mask_region = &empty;
     if (mask_pict && mask_pix &&
-	!vmwgfx_pixmap_validate_hw(mask_pix, mask_region, 0, 0, 0))
+	!vmwgfx_hw_composite_src_stage(mask_pix, mask_pict->format))
+	goto out_err;
+    if (!vmwgfx_hw_composite_dst_stage(dst_pix, dst_pict->format))
 	goto out_err;
 
-    if (dst_region == NULL)
-	dst_region = &empty;
-    if (!vmwgfx_pixmap_validate_hw(dst_pix, dst_region, 0, 0, 0))
+    /*
+     * Seems OK. Commit the changes, creating hardware surfaces.
+     */
+
+    if (src_pix && !vmwgfx_hw_commit(src_pix))
+	goto out_err;
+    if (mask_pict && mask_pix && !vmwgfx_hw_commit(mask_pix))
+	goto out_err;
+    if (!vmwgfx_hw_commit(dst_pix))
 	goto out_err;
 
     /*
@@ -1108,9 +1095,26 @@ vmwgfx_composite_prepare(struct saa_driver *driver, CARD8 op,
     if (xa_composite_prepare(vsaa->xa_ctx, xa_comp))
 	goto out_err;
 
+    /*
+     * Migrate data to surfaces, now that we know that the hardware can indeed
+     * accelerate.
+     */
+
+    if (src_pix && src_region && !vmwgfx_hw_validate(src_pix, src_region))
+	goto out_err_migrate;
+    if (mask_pict && mask_pix && mask_region &&
+	!vmwgfx_hw_validate(mask_pix, mask_region))
+	goto out_err_migrate;
+    if (dst_region && !vmwgfx_hw_validate(dst_pix, dst_region))
+	goto out_err_migrate;
+
+
     REGION_UNINIT(pScreen, &empty);
     return TRUE;
- out_err:
+
+  out_err_migrate:
+    xa_composite_done(vsaa->xa_ctx);
+  out_err:
     REGION_UNINIT(pScreen, &empty);
     return FALSE;
 }

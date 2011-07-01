@@ -21,6 +21,7 @@ vmwgfx_drv_la_SOURCES = \
 	vmwgfx_ctrl.c \
 	vmwgfx_ctrl.h \
 	vmwgfx_xa_composite.c \
+	vmwgfx_xa_surface.c \
 	wsbm_util.h
 
 

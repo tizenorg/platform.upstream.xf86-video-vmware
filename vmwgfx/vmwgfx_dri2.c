@@ -167,9 +167,8 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
     if (!srf) {
 	depth = (format) ? vmwgfx_color_format_to_depth(format) :
 	    pDraw->depth;
-	if (!vmwgfx_pixmap_validate_hw(pPixmap, NULL, depth,
-				       XA_FLAG_SHARED | XA_FLAG_RENDER_TARGET,
-				       0))
+
+	if (!vmwgfx_hw_dri2_validate(pPixmap, depth))
 	    return FALSE;
 
 	srf = vpix->hw;
@@ -308,12 +307,9 @@ dri2_copy_region(DrawablePtr pDraw, RegionPtr pRegion,
 	/* pixmap glXWaitX */
 	if (pSrcBuffer->attachment == DRI2BufferFrontLeft &&
 	    pDestBuffer->attachment == DRI2BufferFakeFrontLeft) {
-	    LogMessage(X_INFO, "dri2 Validate hw.\n");
-	    vmwgfx_pixmap_validate_hw(src_priv->pPixmap, NULL,
-				      0,
-				      XA_FLAG_SHARED | XA_FLAG_RENDER_TARGET,
-				      0);
-	    return;
+
+	    if (!vmwgfx_hw_dri2_validate(src_priv->pPixmap, 0))
+		return;
 	}
 	/* pixmap glXWaitGL */
 	if (pDestBuffer->attachment == DRI2BufferFrontLeft &&
