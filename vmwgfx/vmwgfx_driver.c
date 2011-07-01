@@ -59,6 +59,8 @@
 #include <saa.h>
 #include "vmwgfx_saa.h"
 
+#define XA_VERSION_MINOR_REQUIRED 0
+
 /*
  * Some macros to deal with function wrapping.
  */
@@ -761,6 +763,37 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     if (!ms->xat)
 	xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
 		   "Failed to initialize Gallium3D Xa. No 3D available.\n");
+    else {
+	int major, minor, patch;
+
+	xa_tracker_version(&major, &minor, &patch);
+	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+		   "Gallium3D XA version: %d.%d.%d.\n",
+		   major, minor, patch);
+
+	if (XA_TRACKER_VERSION_MAJOR == 0) {
+	    if (minor != XA_TRACKER_VERSION_MINOR) {
+		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+			   "Expecting XA version 0.%d.x.\n",
+			   XA_TRACKER_VERSION_MINOR);
+		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+			   "No 3D available.\n");
+		xa_tracker_destroy(ms->xat);
+		ms->xat = NULL;
+	    }
+	} else if (major != XA_TRACKER_VERSION_MAJOR ||
+		   minor < XA_VERSION_MINOR_REQUIRED) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		       "Expecting %d.%d.x >= XA version < %d.0.0.\n",
+		       XA_TRACKER_VERSION_MAJOR,
+		       XA_VERSION_MINOR_REQUIRED,
+		       XA_TRACKER_VERSION_MAJOR + 1);
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		       "No 3D available.\n");
+	    xa_tracker_destroy(ms->xat);
+	    ms->xat = NULL;
+	}
+    }
 
     if (!vmwgfx_saa_init(pScreen, ms->fd, ms->xat, &xorg_flush)) {
 	FatalError("Failed to initialize SAA.\n");
