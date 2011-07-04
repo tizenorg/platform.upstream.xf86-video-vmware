@@ -970,7 +970,8 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     }
 
     i = xf86ValidateModes(pScrn, pScrn->monitor->Modes, pScrn->display->modes,
-                          clockRanges, NULL, 256, pVMWARE->maxWidth, 32 * 32,
+                          clockRanges, NULL, 256, pVMWARE->maxWidth,
+                          pVMWARE->bitsPerPixel * 1,
                           128, pVMWARE->maxHeight,
                           pScrn->display->virtualX, pScrn->display->virtualY,
                           pVMWARE->videoRam,

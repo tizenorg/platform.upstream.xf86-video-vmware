@@ -138,6 +138,9 @@ vmwareAddDefaultMode(ScrnInfoPtr pScrn, uint32 dwidth, uint32 dheight)
 	if (dispModeCount == 0) {
 
 	    /*
+	     * Set up a large virtual size, so that we allow also
+	     * setting modes larger than the initial mode.
+	     *
 	     * We might also want to consider the case where
 	     * dispModeCount != 0, but the requested display modes
 	     * are not available. This is sufficient for now.
