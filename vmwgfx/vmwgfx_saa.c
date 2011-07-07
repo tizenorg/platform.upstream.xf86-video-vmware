@@ -94,18 +94,20 @@ vmwgfx_pixmap_remove_present(struct vmwgfx_saa_pixmap *vpix)
 }
 
 static Bool
-vmwgfx_pixmap_add_present(PixmapPtr pixmap)
+vmwgfx_pixmap_add_present(PixmapPtr pixmap, Bool present_opt)
 {
     struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(pixmap);
     ScreenPtr pScreen = pixmap->drawable.pScreen;
     (void) pScreen;
 
-    vpix->dirty_present = REGION_CREATE(pScreen, NULL, 0);
-    if (!vpix->dirty_present)
-	return FALSE;
-    vpix->present_damage = REGION_CREATE(pScreen, NULL, 0);
-    if (!vpix->present_damage)
-	goto out_no_present_damage;
+    if (present_opt) {
+	vpix->dirty_present = REGION_CREATE(pScreen, NULL, 0);
+	if (!vpix->dirty_present)
+	    return FALSE;
+	vpix->present_damage = REGION_CREATE(pScreen, NULL, 0);
+	if (!vpix->present_damage)
+	    goto out_no_present_damage;
+    }
     vpix->pending_update = REGION_CREATE(pScreen, NULL, 0);
     if (!vpix->pending_update)
 	goto out_no_pending_update;
@@ -121,9 +123,11 @@ vmwgfx_pixmap_add_present(PixmapPtr pixmap)
   out_no_pending_present:
     REGION_DESTROY(pScreen, vpix->pending_update);
   out_no_pending_update:
-    REGION_DESTROY(pScreen, vpix->present_damage);
+    if (vpix->present_damage)
+	REGION_DESTROY(pScreen, vpix->present_damage);
   out_no_present_damage:
-    REGION_DESTROY(pScreen, vpix->dirty_present);
+    if (vpix->dirty_present)
+	REGION_DESTROY(pScreen, vpix->dirty_present);
     return FALSE;
 }
 
@@ -1148,6 +1152,11 @@ vmwgfx_takedown(struct saa_driver *driver)
     free(vsaa);
 }
 
+/*
+ * This function call originates from the damage layer (outside SAA)
+ * to indicate that an operation is complete, and that damage is being
+ * processed.
+ */
 static void
 vmwgfx_operation_complete(struct saa_driver *driver,
 			  PixmapPtr pixmap)
@@ -1173,7 +1182,11 @@ vmwgfx_operation_complete(struct saa_driver *driver,
     }
 }
 
-
+/*
+ * This function is called by SAA to indicate that SAA has
+ * dirtied a region of a pixmap, either as hw (accelerated) or as
+ * !hw (not accelerated).
+ */
 static Bool
 vmwgfx_dirty(struct saa_driver *driver, PixmapPtr pixmap,
 	     Bool hw, RegionPtr damage)
@@ -1181,24 +1194,36 @@ vmwgfx_dirty(struct saa_driver *driver, PixmapPtr pixmap,
     struct vmwgfx_saa *vsaa = to_vmwgfx_saa(driver);
     struct saa_pixmap *spix = saa_get_saa_pixmap(pixmap);
     struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
-    BoxPtr rects;
-    int num_rects;
 
-    if (!vmwgfx_is_present_hw(pixmap))
+    /*
+     * Return if this is not a scanout pixmap.
+     */
+    if (WSBMLISTEMPTY(&vpix->scanout_list))
 	return TRUE;
 
-    rects = REGION_RECTS(damage);
-    num_rects = REGION_NUM_RECTS(damage);
+    if (vsaa->only_hw_presents) {
+	if (!vpix->hw) {
+	    if (!vmwgfx_hw_accel_stage(pixmap, 0, XA_FLAG_RENDER_TARGET, 0))
+		return FALSE;
+	    if (!vmwgfx_hw_commit(pixmap))
+		return FALSE;
+	}
+	if (!hw && !vmwgfx_upload_to_hw(&vsaa->driver, pixmap, damage))
+	    return FALSE;
+	REGION_SUBTRACT(&vsaa->pScreen, &spix->dirty_shadow,
+			&spix->dirty_shadow, damage);
+	hw = TRUE;
+    }
 
     /*
      * Is the new scanout damage hw or sw?
      */
-
     if (hw) {
 	/*
 	 * Dump pending present into present tracking region.
 	 */
-	if (REGION_NOTEMPTY(vsaa->pScreen, vpix->present_damage)) {
+	if (vpix->dirty_present &&
+	    REGION_NOTEMPTY(vsaa->pScreen, vpix->present_damage)) {
 	    REGION_UNION(vsaa->pScreen, vpix->dirty_present,
 			 vpix->dirty_present, damage);
 	    REGION_EMPTY(vsaa->pScreen, vpix->present_damage);
@@ -1215,8 +1240,9 @@ vmwgfx_dirty(struct saa_driver *driver, PixmapPtr pixmap,
 	    }
 	    REGION_UNION(vsaa->pScreen, vpix->pending_present,
 			 vpix->pending_present, damage);
-	    REGION_SUBTRACT(vsaa->pScreen, vpix->dirty_present,
-			    vpix->dirty_present, damage);
+	    if (vpix->dirty_present)
+		REGION_SUBTRACT(vsaa->pScreen, vpix->dirty_present,
+				vpix->dirty_present, damage);
 	}
     } else {
 	    if (REGION_NOTEMPTY(vsaa->pScreen, vpix->pending_present)) {
@@ -1231,8 +1257,9 @@ vmwgfx_dirty(struct saa_driver *driver, PixmapPtr pixmap,
 	    }
 	    REGION_UNION(vsaa->pScreen, vpix->pending_update,
 			 vpix->pending_update, damage);
-	    REGION_SUBTRACT(vsaa->pScreen, vpix->dirty_present,
-			    vpix->dirty_present, damage);
+	    if (vpix->dirty_present)
+		REGION_SUBTRACT(vsaa->pScreen, vpix->dirty_present,
+				vpix->dirty_present, damage);
     }
 
     return TRUE;
@@ -1280,6 +1307,8 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
     vsaa->drm_fd = drm_fd;
     vsaa->present_flush = present_flush;
     vsaa->can_optimize_dma = FALSE;
+    vsaa->use_present_opt = TRUE;
+    vsaa->only_hw_presents = FALSE;
     WSBMINITLISTHEAD(&vsaa->sync_x_list);
 
     vsaa->driver = vmwgfx_saa_driver;
@@ -1322,8 +1351,9 @@ vmwgfx_scanout_refresh(PixmapPtr pixmap)
     box.y2 = pixmap->drawable.height;
 
     REGION_RESET(vsaa->pScreen, vpix->pending_update, &box);
-    REGION_SUBTRACT(vsaa->pScreen, vpix->pending_present,
-		    &vpix->base.dirty_hw, vpix->dirty_present);
+    if (vpix->dirty_present)
+	REGION_SUBTRACT(vsaa->pScreen, vpix->pending_present,
+			&vpix->base.dirty_hw, vpix->dirty_present);
     REGION_SUBTRACT(vsaa->pScreen, vpix->pending_update,
 		    vpix->pending_update, &vpix->base.dirty_hw);
 }
@@ -1346,7 +1376,7 @@ vmwgfx_scanout_ref(struct vmwgfx_screen_box  *box)
     if (WSBMLISTEMPTY(&vpix->scanout_list)) {
 	ret = !vmwgfx_pixmap_create_gmr(vsaa, pixmap);
 	if (!ret)
-	    ret = !vmwgfx_pixmap_add_present(pixmap);
+	    ret = !vmwgfx_pixmap_add_present(pixmap, vsaa->use_present_opt);
 	if (!ret)
 	    ret = drmModeAddFB(vsaa->drm_fd,
 			       pixmap->drawable.width,
