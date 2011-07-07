@@ -439,6 +439,9 @@ vmwgfx_hw_kill(struct vmwgfx_saa *vsaa,
 {
     struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
 
+    if (!vpix->hw)
+	return TRUE;
+
     /*
      * Read back any dirty regions from hardware.
      */
@@ -846,9 +849,9 @@ vmwgfx_copy_prepare(struct saa_driver *driver,
 	if (!has_dirty_hw && !has_valid_hw)
 	    return FALSE;
 
+	if (!vmwgfx_hw_accel_validate(src_pixmap, 0, 0, 0, src_reg))
+	    return FALSE;
 	if (vmwgfx_present_prepare(vsaa, src_vpix, dst_vpix)) {
-	  if (!vmwgfx_hw_accel_validate(src_pixmap, 0, 0, 0, src_reg))
-		return FALSE;
 	    vsaa->present_copy = TRUE;
 	    return TRUE;
 	}
@@ -886,14 +889,6 @@ vmwgfx_copy_prepare(struct saa_driver *driver,
 	    return FALSE;
 
 	/*
-	 * Setup copy state.
-	 */
-
-	if (xa_copy_prepare(vsaa->xa_ctx, dst_vpix->hw, src_vpix->hw) !=
-	    XA_ERR_NONE)
-	    return FALSE;
-
-	/*
 	 * Migrate data.
 	 */
 
@@ -901,6 +896,14 @@ vmwgfx_copy_prepare(struct saa_driver *driver,
 	    xa_copy_done(vsaa->xa_ctx);
 	    return FALSE;
 	}
+
+	/*
+	 * Setup copy state.
+	 */
+
+	if (xa_copy_prepare(vsaa->xa_ctx, dst_vpix->hw, src_vpix->hw) !=
+	    XA_ERR_NONE)
+	    return FALSE;
 
 	return TRUE;
     }
@@ -1016,10 +1019,9 @@ vmwgfx_composite_prepare(struct saa_driver *driver, CARD8 op,
 
     /*
      * First we define our migration policy. We accelerate only if there
-     * is dirty hw regions to be read or if all source data is
+     * are dirty hw regions to be read or if all source data is
      * available in hw, and the destination has a hardware surface.
      */
-
     dst_vpix = vmwgfx_saa_pixmap(dst_pix);
     valid_hw = (dst_vpix->hw != NULL);
     if (saa_op_reads_destination(op)) {
@@ -1064,7 +1066,6 @@ vmwgfx_composite_prepare(struct saa_driver *driver, CARD8 op,
     /*
      * Check that we can create the needed hardware surfaces.
      */
-
     if (src_pix && !vmwgfx_hw_composite_src_stage(src_pix, src_pict->format))
 	goto out_err;
     if (mask_pict && mask_pix &&
@@ -1076,7 +1077,6 @@ vmwgfx_composite_prepare(struct saa_driver *driver, CARD8 op,
     /*
      * Seems OK. Commit the changes, creating hardware surfaces.
      */
-
     if (src_pix && !vmwgfx_hw_commit(src_pix))
 	goto out_err;
     if (mask_pict && mask_pix && !vmwgfx_hw_commit(mask_pix))
@@ -1086,34 +1086,33 @@ vmwgfx_composite_prepare(struct saa_driver *driver, CARD8 op,
 
     /*
      * Update the XA state with our hardware surfaces and
-     * surface formats, and bind the XA state for compositing.
+     * surface formats
      */
-
     if (!vmwgfx_xa_update_comp(xa_comp, src_pix, mask_pix, dst_pix))
 	goto out_err;
 
-    if (xa_composite_prepare(vsaa->xa_ctx, xa_comp))
+    /*
+     * Migrate data to surfaces.
+     */
+    if (src_pix && src_region && !vmwgfx_hw_validate(src_pix, NULL))
+	goto out_err;
+    if (mask_pict && mask_pix && mask_region &&
+	!vmwgfx_hw_validate(mask_pix, NULL))
+	goto out_err;
+    if (dst_region && !vmwgfx_hw_validate(dst_pix, NULL))
 	goto out_err;
 
+
     /*
-     * Migrate data to surfaces, now that we know that the hardware can indeed
-     * accelerate.
+     * Bind the XA state. This must be done after data migration, since
+     * migration may change the hardware surfaces.
      */
-
-    if (src_pix && src_region && !vmwgfx_hw_validate(src_pix, src_region))
-	goto out_err_migrate;
-    if (mask_pict && mask_pix && mask_region &&
-	!vmwgfx_hw_validate(mask_pix, mask_region))
-	goto out_err_migrate;
-    if (dst_region && !vmwgfx_hw_validate(dst_pix, dst_region))
-	goto out_err_migrate;
-
+    if (xa_composite_prepare(vsaa->xa_ctx, xa_comp))
+	goto out_err;
 
     REGION_UNINIT(pScreen, &empty);
     return TRUE;
 
-  out_err_migrate:
-    xa_composite_done(vsaa->xa_ctx);
   out_err:
     REGION_UNINIT(pScreen, &empty);
     return FALSE;

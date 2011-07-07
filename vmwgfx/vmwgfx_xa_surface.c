@@ -110,7 +110,7 @@ vmwgfx_old_format_compatible(enum xa_formats format,
 			     enum xa_formats old_format)
 {
     return (format == old_format ||
-	    (xa_format_type(old_format) == xa_format_type(old_format) &&
+	    (xa_format_type(format) == xa_format_type(old_format) &&
 	     xa_format_a(format) <= xa_format_a(old_format) &&
 	     xa_format_r(format) == xa_format_r(old_format) &&
 	     xa_format_g(format) == xa_format_g(old_format) &&
@@ -133,7 +133,6 @@ vmwgfx_hw_composite_dst_stage(PixmapPtr pixmap,
     /*
      * Check if we can reuse old hardware format.
      */
-
     if (vpix->hw) {
 	enum xa_formats old_format = xa_surface_format(vpix->hw);
 
@@ -150,6 +149,7 @@ vmwgfx_hw_composite_dst_stage(PixmapPtr pixmap,
     vpix->staging_format = format;
     vpix->staging_remove_flags = 0;
     vpix->staging_add_flags = XA_FLAG_RENDER_TARGET;
+
     return TRUE;
 }
 
