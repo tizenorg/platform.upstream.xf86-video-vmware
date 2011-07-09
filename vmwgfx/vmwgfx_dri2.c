@@ -271,10 +271,6 @@ dri2_copy_region(DrawablePtr pDraw, RegionPtr pRegion,
     RegionPtr myClip;
     GCPtr gc;
 
-    if (pSrcBuffer->attachment == DRI2BufferFrontLeft &&
-	pDestBuffer->attachment == DRI2BufferFakeFrontLeft)
-      LogMessage(X_ERROR, "glxwaitx\n");
-
     /*
      * In driCreateBuffers we dewrap windows into the
      * backing pixmaps in order to get to the texture.
@@ -332,7 +328,8 @@ dri2_copy_region(DrawablePtr pDraw, RegionPtr pRegion,
      * that something changed.
      */
     DamageRegionAppend(src_draw, pRegion);
-    saa_drawable_dirty(src_draw, TRUE, pRegion);
+    if (pSrcBuffer->attachment != DRI2BufferFrontLeft)
+	saa_drawable_dirty(src_draw, TRUE, pRegion);
     DamageRegionProcessPending(src_draw);
 
     /*
