@@ -92,7 +92,7 @@ PKG_CHECK_EXISTS([xorg-server >= 1.4.99],
 PKG_CHECK_EXISTS([xorg-server >= 1.7.0],
                  [AC_DEFINE([HAVE_XORG_SERVER_1_7_0], 1,
                  [Has version 1.7.0 or greater of the Xserver])
-		 BUILD_VMWGFX=yes],[BUILD_VMWGFX=yes])
+		 BUILD_VMWGFX=yes],[BUILD_VMWGFX=no])
 
 # Obtain compiler/linker options for the vmwarectrl client tool
 PKG_CHECK_MODULES(X11, x11 xext)
