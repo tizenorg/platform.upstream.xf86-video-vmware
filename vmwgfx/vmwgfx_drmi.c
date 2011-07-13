@@ -33,7 +33,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <sys/mman.h>
-#include <drm/vmwgfx_drm.h>
+#include "vmwgfx_drm.h"
 #include <xf86drm.h>
 #include "vmwgfx_drmi.h"
 

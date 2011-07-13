@@ -61,7 +61,7 @@ typedef uint8_t uint8;
 #include <X11/extensions/Xv.h>
 
 #include "xf86drm.h"
-#include <drm/vmwgfx_drm.h>
+#include "vmwgfx_drm.h"
 #include "vmwgfx_drmi.h"
 #include "vmwgfx_driver.h"
 
