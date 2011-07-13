@@ -56,7 +56,6 @@
 #include "mi.h"
 #include "dix.h"
 #include "fb.h"
-#include "fboverlay.h"
 #ifdef RENDER
 #include "glyphstr.h"
 #endif

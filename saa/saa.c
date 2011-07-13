@@ -36,7 +36,6 @@
 
 #include "saa_priv.h"
 #include <X11/fonts/fontstruct.h>
-#include "dixfontstr.h"
 #include "regionstr.h"
 #include "saa.h"
 #include "saa_priv.h"
