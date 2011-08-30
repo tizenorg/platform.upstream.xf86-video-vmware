@@ -112,6 +112,8 @@ typedef struct _modesettingRec
 #ifdef DRI2
     Bool dri2_available;
 #endif
+
+    Bool initialization;
 } modesettingRec, *modesettingPtr;
 
 #define modesettingPTR(p) ((modesettingPtr)((p)->driverPrivate))

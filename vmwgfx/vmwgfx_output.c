@@ -104,7 +104,25 @@ output_detect(xf86OutputPtr output)
 
     switch (drm_connector->connection) {
     case DRM_MODE_CONNECTED:
-	status = XF86OutputStatusConnected;
+	/*
+	 * Hack to avoid enabling outputs during the intial
+	 * configuration that are connected but that we don't
+	 * really want to have enabled just yet.
+	 *
+	 * If we are in initial config, and
+	 * an output higher than LVDS1 is connected,
+	 * and it has no monitor section in the config file,
+	 * status will be reported as unknown, which means
+	 * the xorg modesetting code will think it is
+	 * disconnected.
+	 */
+
+	if (ms->initialization &&
+	    drm_connector->connector_type_id != 1 &&
+	    !output->conf_monitor)
+	    status = XF86OutputStatusUnknown;
+	else
+	    status = XF86OutputStatusConnected;
 	break;
     case DRM_MODE_DISCONNECTED:
 	status = XF86OutputStatusDisconnected;

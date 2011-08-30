@@ -426,10 +426,12 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     xorg_crtc_init(pScrn);
     xorg_output_init(pScrn);
 
+    ms->initialization = TRUE;
     if (!xf86InitialConfiguration(pScrn, TRUE)) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No valid modes.\n");
 	return FALSE;
     }
+    ms->initialization = FALSE;
 
     /*
      * If the driver can do gamma correction, it should call xf86SetGamma() here.
