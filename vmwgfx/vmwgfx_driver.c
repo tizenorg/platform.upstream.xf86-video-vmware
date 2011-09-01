@@ -60,6 +60,8 @@
 #include "vmwgfx_saa.h"
 
 #define XA_VERSION_MINOR_REQUIRED 0
+#define DRM_VERSION_MAJOR_REQUIRED 2
+#define DRM_VERSION_MINOR_REQUIRED 1
 
 /*
  * Some macros to deal with function wrapping.
@@ -268,8 +270,22 @@ drv_init_drm(ScrnInfoPtr pScrn)
 	ms->isMaster = TRUE;
 	free(BusID);
 
-	if (ms->fd >= 0)
+	if (ms->fd >= 0) {
+	    drmVersionPtr ver = drmGetVersion(ms->fd);
+
+	    if (ver == NULL) {
+		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+			   "Could not determine DRM version.\n");
+		return FALSE;
+	    }
+
+	    ms->drm_major = ver->version_major;
+	    ms->drm_minor = ver->version_minor;
+	    ms->drm_patch = ver->version_patchlevel;
+
+	    drmFreeVersion(ver);
 	    return TRUE;
+	}
 
 	return FALSE;
     }
@@ -337,6 +353,22 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     ms->fd = -1;
     if (!drv_init_drm(pScrn))
 	return FALSE;
+
+    if (ms->drm_major != DRM_VERSION_MAJOR_REQUIRED ||
+	ms->drm_minor < DRM_VERSION_MINOR_REQUIRED) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		   "DRM driver version is %d.%d.%d\n",
+		   ms->drm_major, ms->drm_minor, ms->drm_patch);
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		   "But this driver needs %d.%d.x to work. Giving up.\n",
+		   DRM_VERSION_MAJOR_REQUIRED,
+		   DRM_VERSION_MINOR_REQUIRED);
+	return FALSE;
+    } else {
+	xf86DrvMsg(pScrn->scrnIndex, X_PROBED,
+		   "DRM driver version is %d.%d.%d\n",
+		   ms->drm_major, ms->drm_minor, ms->drm_patch);
+    }
 
     ms->check_fb_size = (vmwgfx_max_fb_size(ms->fd, &ms->max_fb_size) == 0);
 
@@ -515,7 +547,7 @@ vmwgfx_scanout_present(ScreenPtr pScreen, int drm_fd,
 	return FALSE;
     }
 
-    if (vmwgfx_present(drm_fd, 0, 0, dirty, handle) != 0) {
+    if (vmwgfx_present(drm_fd, vpix->fb_id, 0, 0, dirty, handle) != 0) {
 	LogMessage(X_ERROR, "Could not get present surface handle.\n");
 	return FALSE;
     }

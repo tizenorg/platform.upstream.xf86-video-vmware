@@ -46,150 +46,137 @@
 #include "vmwgfx_driver.h"
 
 static int
-vmwgfx_fence_wait(int drm_fd, uint64_t seq)
+vmwgfx_fence_wait(int drm_fd, uint32_t handle, Bool unref)
 {
 	struct drm_vmw_fence_wait_arg farg;
 	memset(&farg, 0, sizeof(farg));
 
-	farg.sequence = seq;
+	farg.handle = handle;
+	farg.flags = DRM_VMW_FENCE_FLAG_EXEC;
+	farg.timeout_us = 10*1000000;
 	farg.cookie_valid = 0;
+
+	if (unref)
+	    farg.wait_options |= DRM_VMW_WAIT_OPTION_UNREF;
 
 	return drmCommandWriteRead(drm_fd, DRM_VMW_FENCE_WAIT, &farg,
 				   sizeof(farg));
 }
 
+static void
+vmwgfx_fence_unref(int drm_fd, uint32_t handle)
+{
+	struct drm_vmw_fence_arg farg;
+	memset(&farg, 0, sizeof(farg));
+
+	farg.handle = handle;
+
+	(void) drmCommandWrite(drm_fd, DRM_VMW_FENCE_UNREF, &farg,
+			       sizeof(farg));
+}
+
+
 int
-vmwgfx_present_readback(int drm_fd, RegionPtr region)
+vmwgfx_present_readback(int drm_fd, uint32_t fb_id, RegionPtr region)
 {
     BoxPtr clips = REGION_RECTS(region);
     unsigned int num_clips = REGION_NUM_RECTS(region);
-    struct drm_vmw_execbuf_arg arg;
     struct drm_vmw_fence_rep rep;
+    struct drm_vmw_present_readback_arg arg;
     int ret;
-    unsigned int size;
     unsigned i;
-    SVGA3dRect *cr;
+    struct drm_vmw_rect *rects, *r;
 
-    struct {
-	SVGA3dCmdHeader header;
-	SVGA3dRect cr;
-    } *cmd;
-
-    if (num_clips == 0)
-	return 0;
-
-    size = sizeof(*cmd) + (num_clips - 1) * sizeof(cmd->cr);
-    cmd = malloc(size);
-    if (!cmd)
+    rects = calloc(num_clips, sizeof(*rects));
+    if (!rects) {
+	LogMessage(X_ERROR, "Failed to alloc cliprects for "
+		   "present readback.\n");
 	return -1;
-
-    cmd->header.id = SVGA_3D_CMD_PRESENT_READBACK;
-    cmd->header.size = num_clips * sizeof(cmd->cr);
-
-    for (i=0, cr = &cmd->cr; i < num_clips; i++, cr++, clips++) {
-	cr->x = (uint16_t) clips->x1;
-	cr->y = (uint16_t) clips->y1;
-	cr->w = (uint16_t) (clips->x2 - clips->x1);
-	cr->h = (uint16_t) (clips->y2 - clips->y1);
-#if 0
-	LogMessage(X_INFO,
-		   "Readback x: %u y: %u srcx: %u srcy: %u w: %u h: %u\n",
-		   cr->x, cr->y, cr->x, cr->y, cr->w, cr->h);
-#endif
     }
-
 
     memset(&arg, 0, sizeof(arg));
     memset(&rep, 0, sizeof(rep));
 
+    arg.fb_id = fb_id;
+    arg.num_clips = num_clips;
+    arg.clips_ptr = (unsigned long) rects;
+    arg.fence_rep = (unsigned long) &rep;
     rep.error = -EFAULT;
-    arg.fence_rep = (unsigned long)&rep;
-    arg.commands = (unsigned long)cmd;
-    arg.command_size = size;
-    arg.throttle_us = 0;
 
-    ret = drmCommandWrite(drm_fd, DRM_VMW_EXECBUF, &arg, sizeof(arg));
+    for (i = 0, r = rects; i < num_clips; ++i, ++r, ++clips) {
+	r->x = clips->x1;
+	r->y = clips->y1;
+	r->w = clips->x2 - clips->x1;
+	r->h = clips->y2 - clips->y1;
+    }
+
+    ret = drmCommandWrite(drm_fd, DRM_VMW_PRESENT_READBACK, &arg, sizeof(arg));
     if (ret)
 	LogMessage(X_ERROR, "Present readback error %s.\n", strerror(-ret));
-
-    free(cmd);
+    free(rects);
 
     /*
      * Sync to avoid racing with Xorg SW rendering.
      */
 
     if (rep.error == 0) {
-	ret = vmwgfx_fence_wait(drm_fd, rep.fence_seq);
-	if (ret)
+	ret = vmwgfx_fence_wait(drm_fd, rep.handle, TRUE);
+	if (ret) {
 	    LogMessage(X_ERROR, "Present readback fence wait error %s.\n",
 		       strerror(-ret));
+	    vmwgfx_fence_unref(drm_fd, rep.handle);
+	}
     }
 
     return 0;
 }
 
+
 int
-vmwgfx_present(int drm_fd, unsigned int dst_x, unsigned int dst_y,
-	       RegionPtr region, uint32_t handle)
+vmwgfx_present(int drm_fd, uint32_t fb_id, unsigned int dst_x,
+	       unsigned int dst_y, RegionPtr region, uint32_t handle)
 {
     BoxPtr clips = REGION_RECTS(region);
     unsigned int num_clips = REGION_NUM_RECTS(region);
-    struct drm_vmw_execbuf_arg arg;
-    struct drm_vmw_fence_rep rep;
+    struct drm_vmw_present_arg arg;
+    unsigned int i;
+    struct drm_vmw_rect *rects, *r;
     int ret;
-    unsigned int size;
-    unsigned i;
-    SVGA3dCopyRect *cr;
-
-    struct {
-	SVGA3dCmdHeader header;
-	SVGA3dCmdPresent body;
-	SVGA3dCopyRect cr;
-    } *cmd;
 
     if (num_clips == 0)
 	return 0;
 
-    size = sizeof(*cmd) + (num_clips - 1) * sizeof(cmd->cr);
-    cmd = malloc(size);
-    if (!cmd)
+    rects = calloc(num_clips, sizeof(*rects));
+    if (!rects) {
+	LogMessage(X_ERROR, "Failed to alloc cliprects for "
+		   "present.\n");
 	return -1;
-
-    cmd->header.id = SVGA_3D_CMD_PRESENT;
-    cmd->header.size = sizeof(cmd->body) + num_clips * sizeof(cmd->cr);
-    cmd->body.sid = handle;
-
-
-    for (i=0, cr = &cmd->cr; i < num_clips; i++, cr++, clips++) {
-	cr->x = (uint16_t) clips->x1 + dst_x;
-	cr->y = (uint16_t) clips->y1 + dst_y;
-	cr->srcx = (uint16_t) clips->x1;
-	cr->srcy = (uint16_t) clips->y1;
-	cr->w = (uint16_t) (clips->x2 - clips->x1);
-	cr->h = (uint16_t) (clips->y2 - clips->y1);
-#if 0
-	LogMessage(X_INFO, "Present: x: %u y: %u srcx: %u srcy: %u w: %u h: %u\n",
-		   cr->x, cr->y, cr->srcx, cr->srcy, cr->w, cr->h);
-#endif
     }
 
     memset(&arg, 0, sizeof(arg));
-    memset(&rep, 0, sizeof(rep));
+    arg.fb_id = fb_id;
+    arg.sid = handle;
+    arg.dest_x = dst_x;
+    arg.dest_y = dst_y;
+    arg.num_clips = num_clips;
+    arg.clips_ptr = (unsigned long) rects;
 
-    rep.error = -EFAULT;
-    arg.fence_rep = (unsigned long)&rep;
-    arg.commands = (unsigned long)cmd;
-    arg.command_size = size;
-    arg.throttle_us = 0;
+    for (i = 0, r = rects; i < num_clips; ++i, ++r, ++clips) {
+	r->x = clips->x1;
+	r->y = clips->y1;
+	r->w = clips->x2 - clips->x1;
+	r->h = clips->y2 - clips->y1;
+    }
 
-    ret = drmCommandWrite(drm_fd, DRM_VMW_EXECBUF, &arg, sizeof(arg));
+    ret = drmCommandWrite(drm_fd, DRM_VMW_PRESENT, &arg, sizeof(arg));
     if (ret) {
 	LogMessage(X_ERROR, "Present error %s.\n", strerror(-ret));
     }
 
-    free(cmd);
-    return 0;
+    free(rects);
+    return ((ret != 0) ? -1 : 0);
 }
+
 
 struct vmwgfx_int_dmabuf {
     struct vmwgfx_dmabuf buf;
@@ -374,10 +361,11 @@ vmwgfx_dma(unsigned int host_x, unsigned int host_y,
     memset(&rep, 0, sizeof(rep));
 
     rep.error = -EFAULT;
-    arg.fence_rep = (unsigned long)&rep;
+    arg.fence_rep = ((to_surface) ? 0UL : (unsigned long)&rep);
     arg.commands = (unsigned long)cmd;
     arg.command_size = size;
     arg.throttle_us = 0;
+    arg.version = DRM_VMW_EXECBUF_VERSION;
 
     ret = drmCommandWrite(ibuf->drm_fd, DRM_VMW_EXECBUF, &arg, sizeof(arg));
     if (ret) {
@@ -386,11 +374,13 @@ vmwgfx_dma(unsigned int host_x, unsigned int host_y,
 
     free(cmd);
 
-    if (!to_surface && rep.error == 0) {
-	ret = vmwgfx_fence_wait(ibuf->drm_fd, rep.fence_seq);
-	if (ret)
+    if (rep.error == 0) {
+	ret = vmwgfx_fence_wait(ibuf->drm_fd, rep.handle, TRUE);
+	if (ret) {
 	    LogMessage(X_ERROR, "DMA from host fence wait error %s.\n",
 		       strerror(-ret));
+	    vmwgfx_fence_unref(ibuf->drm_fd, rep.handle);
+	}
     }
 
     return 0;
@@ -485,23 +475,12 @@ vmwgfx_cursor_bypass(int drm_fd, int xhot, int yhot)
 int
 vmwgfx_max_fb_size(int drm_fd, size_t *size)
 {
-    drmVersionPtr ver;
-    int ret = -1;
     uint64_t tmp_size;
 
-    ver = drmGetVersion(drm_fd);
-    if (ver == NULL ||
-	!(ver->version_major > 1 ||
-	  (ver->version_major == 1 && ver->version_minor >= 3)))
-	goto out;
-
     if (vmwgfx_get_param(drm_fd, DRM_VMW_PARAM_MAX_FB_SIZE, &tmp_size) != 0)
-	goto out;
+	return -1;
 
     *size = tmp_size;
-    ret = 0;
 
-  out:
-    drmFreeVersion(ver);
-    return ret;
+    return 0;
 }

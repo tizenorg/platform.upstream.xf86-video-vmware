@@ -264,7 +264,8 @@ vmwgfx_pixmap_present_readback(struct vmwgfx_saa *vsaa,
 	REGION_INTERSECT(vsaa->pScreen, &screen_intersection,
 			 &screen_intersection, &intersection);
 
-	if (vmwgfx_present_readback(vsaa->drm_fd, &intersection) != 0)
+	if (vmwgfx_present_readback(vsaa->drm_fd, vpix->fb_id,
+				    &intersection) != 0)
 	    goto out_readback_err;
 
 	REGION_SUBTRACT(vsaa->pScreen, &intersection, &intersection,
@@ -926,7 +927,8 @@ vmwgfx_present_done(struct vmwgfx_saa *vsaa)
     if (!vsaa->diff_valid)
 	return;
 
-    (void) vmwgfx_present(vsaa->drm_fd, vsaa->xdiff, vsaa->ydiff,
+    (void) vmwgfx_present(vsaa->drm_fd, dst_vpix->fb_id,
+			  vsaa->xdiff, vsaa->ydiff,
 			  &vsaa->present_region, vsaa->src_handle);
 
     REGION_TRANSLATE(pScreen, &vsaa->present_region, vsaa->xdiff, vsaa->ydiff);

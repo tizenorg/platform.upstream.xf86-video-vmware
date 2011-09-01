@@ -36,11 +36,11 @@
 struct vmwgfx_dma_ctx;
 
 extern int
-vmwgfx_present_readback(int drm_fd, RegionPtr region);
+vmwgfx_present_readback(int drm_fd, uint32_t fb_id, RegionPtr region);
 
 extern int
-vmwgfx_present(int drm_fd, unsigned int dst_x, unsigned int dst_y,
-	       RegionPtr region, uint32_t handle);
+vmwgfx_present(int drm_fd, uint32_t fb_id, unsigned int dst_x,
+	       unsigned int dst_y, RegionPtr region, uint32_t handle);
 
 struct vmwgfx_dmabuf {
   uint32_t handle;

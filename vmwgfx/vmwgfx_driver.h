@@ -74,6 +74,9 @@ typedef struct _modesettingRec
 {
     /* drm */
     int fd;
+    int drm_major;
+    int drm_minor;
+    int drm_patch;
 
     /* X */
     EntPtr entityPrivate;
@@ -165,10 +168,6 @@ XF86VideoAdaptorPtr
 vmw_video_init_adaptor(ScrnInfoPtr pScrn);
 void
 vmw_video_free_adaptor(XF86VideoAdaptorPtr adaptor, Bool free_ports);
-
-int
-vmwgfx_present(int drm_fd, unsigned int dst_x, unsigned int dst_y,
-	       RegionPtr region, uint32_t handle);
 
 void
 vmw_ctrl_ext_init(ScrnInfoPtr pScrn);
