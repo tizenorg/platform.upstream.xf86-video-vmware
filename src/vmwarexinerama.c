@@ -48,6 +48,26 @@
 #include <xf86_libc.h>
 #endif
 
+/* 
+ * LookupWindow was removed with video abi 11.
+ */
+#if (GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 4)
+#ifndef DixGetAttrAccess
+#define DixGetAttrAccess   (1<<4)
+#endif
+#endif
+
+#if (GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 2)
+static inline int
+dixLookupWindow(WindowPtr *pWin, XID id, ClientPtr client, Mask access)
+{
+    *pWin = LookupWindow(id, client);
+    if (!*pWin)
+	return BadWindow;
+    return Success;
+}
+#endif
+
 
 /*
  *----------------------------------------------------------------------------
@@ -116,10 +136,12 @@ VMwareXineramaGetState(ClientPtr client)
     ExtensionEntry *ext;
     ScrnInfoPtr pScrn;
     VMWAREPtr pVMWARE;
+    int rc;
 
     REQUEST_SIZE_MATCH(xPanoramiXGetStateReq);
-    pWin = LookupWindow(stuff->window, client);
-    if(!pWin) return BadWindow;
+    rc = dixLookupWindow(&pWin, stuff->window, client, DixGetAttrAccess);
+    if (rc != Success)
+	return rc;
 
     if (!(ext = CheckExtension(PANORAMIX_PROTOCOL_NAME))) {
        return BadMatch;
@@ -167,10 +189,12 @@ VMwareXineramaGetScreenCount(ClientPtr client)
     ExtensionEntry *ext;
     ScrnInfoPtr pScrn;
     VMWAREPtr pVMWARE;
+    int rc;
 
     REQUEST_SIZE_MATCH(xPanoramiXGetScreenCountReq);
-    pWin = LookupWindow(stuff->window, client);
-    if(!pWin) return BadWindow;
+    rc = dixLookupWindow(&pWin, stuff->window, client, DixGetAttrAccess);
+    if (rc != Success)
+	return rc;
 
     if (!(ext = CheckExtension(PANORAMIX_PROTOCOL_NAME))) {
        return BadMatch;
@@ -218,10 +242,12 @@ VMwareXineramaGetScreenSize(ClientPtr client)
     ExtensionEntry *ext;
     ScrnInfoPtr pScrn;
     VMWAREPtr pVMWARE;
+    int rc;
 
     REQUEST_SIZE_MATCH(xPanoramiXGetScreenSizeReq);
-    pWin = LookupWindow (stuff->window, client);
-    if(!pWin)  return BadWindow;
+    rc = dixLookupWindow(&pWin, stuff->window, client, DixGetAttrAccess);
+    if (rc != Success)
+	return rc;
 
     if (!(ext = CheckExtension(PANORAMIX_PROTOCOL_NAME))) {
        return BadMatch;
