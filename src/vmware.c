@@ -612,8 +612,10 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     uint32 width = 0, height = 0;
     Bool defaultMode;
 
+#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 12
 #ifndef BUILD_FOR_420
     domainIOBase = pScrn->domainIOBase;
+#endif
 #endif
 
     if (flags & PROBE_DETECT) {
