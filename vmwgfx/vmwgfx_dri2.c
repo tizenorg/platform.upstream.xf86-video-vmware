@@ -48,6 +48,7 @@ typedef struct {
     int refcount;
     PixmapPtr pPixmap;
     struct xa_surface *srf;
+    unsigned int dri2_depth;
 } *BufferPrivatePtr;
 
 
@@ -114,6 +115,7 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
 		return FALSE;
 
 	    private->pPixmap = pPixmap;
+	    private->dri2_depth = depth;
 	    vpix = vmwgfx_saa_pixmap(pPixmap);
 	}
 	break;
@@ -127,6 +129,7 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
       buffer->flags = 0; /* not tiled */
       buffer->format = pDraw->bitsPerPixel;
       if (!private->pPixmap) {
+	private->dri2_depth = 0;
 	private->pPixmap = pPixmap;
 	pPixmap->refcnt++;
       }
@@ -146,6 +149,8 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
 	if (!srf)
 	    return FALSE;
 
+	private->dri2_depth = depth;
+
        break;
     case DRI2BufferDepth:
 	depth = (format) ? vmwgfx_z_format_to_depth(format) :
@@ -156,6 +161,9 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
 				XA_FLAG_SHARED);
 	if (!srf)
 	    return FALSE;
+
+	private->dri2_depth = depth;
+
 	break;
     }
 
@@ -179,6 +187,7 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
 
 	vpix->hw_is_dri2_fronts++;
 	private->refcount++;
+	private->dri2_depth = depth;
     }
 
     private->srf = srf;
@@ -303,8 +312,9 @@ dri2_copy_region(DrawablePtr pDraw, RegionPtr pRegion,
 	/* pixmap glXWaitX */
 	if (pSrcBuffer->attachment == DRI2BufferFrontLeft &&
 	    pDestBuffer->attachment == DRI2BufferFakeFrontLeft) {
-
-	    if (!vmwgfx_hw_dri2_validate(src_priv->pPixmap, 0))
+	    
+	    if (!vmwgfx_hw_dri2_validate(dst_priv->pPixmap,
+					 dst_priv->dri2_depth))
 		return;
 	}
 	/* pixmap glXWaitGL */
