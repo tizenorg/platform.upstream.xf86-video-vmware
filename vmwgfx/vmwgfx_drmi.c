@@ -473,6 +473,22 @@ vmwgfx_cursor_bypass(int drm_fd, int xhot, int yhot)
 }
 
 int
+vmwgfx_update_gui_layout(int drm_fd, unsigned int num_rects,
+			 struct drm_vmw_rect *rects)
+{
+    struct drm_vmw_update_layout_arg arg;
+
+    memset(&arg, 0, sizeof(arg));
+
+    arg.num_outputs = num_rects;
+    arg.rects = (unsigned long) rects;
+
+    return drmCommandWrite(drm_fd, DRM_VMW_UPDATE_LAYOUT, &arg,
+			   sizeof(arg));
+}
+
+
+int
 vmwgfx_max_fb_size(int drm_fd, size_t *size)
 {
     uint64_t tmp_size;

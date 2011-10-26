@@ -32,6 +32,7 @@
 #include <xorg-server.h>
 #include <regionstr.h>
 #include <stdint.h>
+#include "vmwgfx_drm.h"
 
 struct vmwgfx_dma_ctx;
 
@@ -78,4 +79,7 @@ vmwgfx_cursor_bypass(int drm_fd, int xhot, int yhot);
 int
 vmwgfx_max_fb_size(int drm_fd, size_t *size);
 
+int
+vmwgfx_update_gui_layout(int drm_fd, unsigned int num_rects,
+			 struct drm_vmw_rect *rects);
 #endif

@@ -39,9 +39,8 @@
 #include <X11/extensions/panoramiXproto.h>
 
 #include "vmwarectrlproto.h"
-#include "xf86drm.h"
 #include "vmwgfx_driver.h"
-
+#include "vmwgfx_drmi.h"
 
 /*
  *----------------------------------------------------------------------------
@@ -110,17 +109,17 @@ VMwareCtrlDoSetRes(ScrnInfoPtr pScrn,
                    CARD32 x,
                    CARD32 y)
 {
-#if 0
-   struct vmw_rect rect;
+   modesettingPtr ms = modesettingPTR(pScrn);
+   struct drm_vmw_rect rect;
+   int ret;
+
    rect.x = 0;
    rect.y = 0;
    rect.w = x;
    rect.h = y;
 
-   vmw_ioctl_update_layout(vmw, 1, &rect);
-#endif
-
-   return TRUE;
+   ret = vmwgfx_update_gui_layout(ms->fd, 1, &rect);
+   return (ret == 0);
 }
 
 
@@ -208,10 +207,10 @@ VMwareCtrlDoSetTopology(ScrnInfoPtr pScrn,
                         xXineramaScreenInfo *extents,
                         unsigned long number)
 {
-#if 0
-   struct vmw_rect *rects;
-   struct vmw_customizer *vmw = vmw_customizer(xorg_customizer(pScrn));
+   modesettingPtr ms = modesettingPTR(pScrn);
+   struct drm_vmw_rect *rects;
    int i;
+   int ret;
 
    rects = calloc(number, sizeof(*rects));
    if (!rects)
@@ -224,11 +223,10 @@ VMwareCtrlDoSetTopology(ScrnInfoPtr pScrn,
       rects[i].h = extents[i].height;
    }
 
-   vmw_ioctl_update_layout(vmw, number, rects);
+   ret = vmwgfx_update_gui_layout(ms->fd, number, rects);
 
    free(rects);
-#endif
-   return TRUE;
+   return (ret == 0);
 }
 
 

@@ -61,7 +61,7 @@
 
 #define XA_VERSION_MINOR_REQUIRED 0
 #define DRM_VERSION_MAJOR_REQUIRED 2
-#define DRM_VERSION_MINOR_REQUIRED 1
+#define DRM_VERSION_MINOR_REQUIRED 3
 
 /*
  * Some macros to deal with function wrapping.
