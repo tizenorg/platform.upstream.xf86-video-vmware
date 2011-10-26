@@ -180,9 +180,11 @@ crtc_set_mode_major(xf86CrtcPtr crtc, DisplayModePtr mode,
     if (!xf86CrtcRotate(crtc))
 	return FALSE;
 
-    if (crtc->transform_in_use && crtc->rotatedData)
+    if (crtc->transform_in_use && crtc->rotatedData) {
+	x = 0;
+	y = 0;
 	pixmap = (PixmapPtr) crtc->rotatedData;
-    else
+    } else
 	pixmap = pScreen->GetScreenPixmap(pScreen);
 
     if (crtcp->box.pixmap != pixmap) {
