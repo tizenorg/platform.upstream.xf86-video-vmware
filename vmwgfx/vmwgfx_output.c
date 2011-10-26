@@ -72,6 +72,9 @@ static char *output_enum_list[] = {
     "DP",
     "HDMI",
     "HDMI",
+    "TV",
+    "EDP",
+    "Virtual",
 };
 
 static void
@@ -110,7 +113,7 @@ output_detect(xf86OutputPtr output)
 	 * really want to have enabled just yet.
 	 *
 	 * If we are in initial config, and
-	 * an output higher than LVDS1 is connected,
+	 * an output higher than Virtual1 is connected,
 	 * and it has no monitor section in the config file,
 	 * status will be reported as unknown, which means
 	 * the xorg modesetting code will think it is
@@ -275,6 +278,10 @@ xorg_output_init(ScrnInfoPtr pScrn)
 	(void)p;
 	(void)v;
 #endif
+
+	if (drm_connector->connector_type >=
+	    sizeof(output_enum_list) / sizeof(output_enum_list[0]))
+	    drm_connector->connector_type = 0;
 
 	snprintf(name, 32, "%s%d",
 		 output_enum_list[drm_connector->connector_type],
