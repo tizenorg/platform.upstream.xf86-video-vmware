@@ -105,6 +105,8 @@ typedef struct _modesettingRec
     Bool (*saved_EnterVT)(int, int);
     void (*saved_LeaveVT)(int, int);
     void (*saved_AdjustFrame)(int, int, int, int);
+    Bool (*saved_UseHWCursor)(ScreenPtr, CursorPtr);
+    Bool (*saved_UseHWCursorARGB)(ScreenPtr, CursorPtr);
 
     uint16_t lut_r[256], lut_g[256], lut_b[256];
 
@@ -156,6 +158,9 @@ xorg_output_init(ScrnInfoPtr pScrn);
 
 unsigned
 xorg_output_get_id(xf86OutputPtr output);
+
+Bool
+vmwgfx_output_explicit_overlap(ScrnInfoPtr pScrn);
 
 
 /***********************************************************************

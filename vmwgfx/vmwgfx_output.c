@@ -56,6 +56,8 @@ struct output_private
     drmModeConnectorPtr drm_connector;
 
     int c;
+
+    Bool is_implicit;
 };
 
 static char *output_enum_list[] = {
@@ -237,6 +239,75 @@ static const xf86OutputFuncsRec output_funcs = {
     .destroy = output_destroy,
 };
 
+/**
+ * vmwgfx_output_explicit_overlap -- Check for explicit output overlaps
+ *
+ * This function returns TRUE iff the bounding box in screen space of an
+ * exlplicit output overlaps the bounding box in screen space of any other
+ * output.
+ */
+Bool
+vmwgfx_output_explicit_overlap(ScrnInfoPtr pScrn)
+{
+    xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(pScrn);
+    xf86OutputPtr output;
+    ScreenPtr pScreen = pScrn->pScreen;
+    RegionRec output_union;
+    RegionRec cur_output;
+    RegionRec result;
+    struct output_private *priv;
+    xf86CrtcPtr crtc;
+    Bool overlap = FALSE;
+    int i;
+
+    (void) pScreen;
+    REGION_NULL(pScreen, &output_union);
+    REGION_NULL(pScreen, &cur_output);
+    REGION_NULL(pScreen, &result);
+
+    /*
+     * Collect a region of implicit outputs. These may overlap.
+     */
+    for (i = 0; i < config->num_output; i++) {
+	output = config->output[i];
+	priv = output->driver_private;
+	crtc = output->crtc;
+
+	if (!crtc || !crtc->enabled || !priv->is_implicit)
+	    continue;
+
+	REGION_RESET(pScreen, &cur_output, &crtc->bounds);
+	REGION_UNION(pScreen, &output_union, &output_union, &cur_output);
+    }
+
+    /*
+     * Explicit outputs may not overlap any other output.
+     */
+    for (i = 0; i < config->num_output; i++) {
+	output = config->output[i];
+	priv = output->driver_private;
+	crtc = output->crtc;
+
+	if (!crtc || !crtc->enabled || priv->is_implicit)
+	    continue;
+
+	REGION_RESET(pScreen, &cur_output, &crtc->bounds);
+	REGION_NULL(pScreen, &result);
+	REGION_INTERSECT(pScreen, &result, &output_union, &cur_output);
+	overlap = REGION_NOTEMPTY(vsaa->pScreen, &result);
+	if (overlap)
+	    break;
+
+	REGION_UNION(pScreen, &output_union, &output_union, &cur_output);
+    }
+
+    REGION_UNINIT(pScreen, &output_union);
+    REGION_UNINIT(pScreen, &cur_output);
+    REGION_UNINIT(pScreen, &result);
+
+    return overlap;
+}
+
 void
 xorg_output_init(ScrnInfoPtr pScrn)
 {
@@ -247,7 +318,7 @@ xorg_output_init(ScrnInfoPtr pScrn)
     drmModeEncoderPtr drm_encoder = NULL;
     struct output_private *priv;
     char name[32];
-    int c, v, p;
+    int c, p;
 
     res = drmModeGetResources(ms->fd);
     if (res == 0) {
@@ -256,28 +327,37 @@ xorg_output_init(ScrnInfoPtr pScrn)
     }
 
     for (c = 0; c < res->count_connectors; c++) {
+	Bool is_implicit = TRUE;
+
 	drm_connector = drmModeGetConnector(ms->fd, res->connectors[c]);
 	if (!drm_connector)
 	    goto out;
 
-#if 0
+
 	for (p = 0; p < drm_connector->count_props; p++) {
 	    drmModePropertyPtr prop;
 
 	    prop = drmModeGetProperty(ms->fd, drm_connector->props[p]);
 
-	    name = NULL;
 	    if (prop) {
-		ErrorF("VALUES %d\n", prop->count_values);
 
-		for (v = 0; v < prop->count_values; v++)
-		    ErrorF("%s %lld\n", prop->name, prop->values[v]);
+#if 0
+	      /*
+	       * Disabled until we sort out what the interface should
+	       * look like.
+	       */
+
+		if (strcmp(prop->name, "implicit placement") == 0) {
+		    drmModeConnectorSetProperty(ms->fd,
+						drm_connector->connector_id,
+						prop->prop_id,
+						0);
+		    is_implicit = FALSE;
+		}
+#endif
+		drmModeFreeProperty(prop);
 	    }
 	}
-#else
-	(void)p;
-	(void)v;
-#endif
 
 	if (drm_connector->connector_type >=
 	    sizeof(output_enum_list) / sizeof(output_enum_list[0]))
@@ -298,6 +378,8 @@ xorg_output_init(ScrnInfoPtr pScrn)
 	    free(priv);
 	    continue;
 	}
+
+	priv->is_implicit = is_implicit;
 
 	drm_encoder = drmModeGetEncoder(ms->fd, drm_connector->encoders[0]);
 	if (drm_encoder) {

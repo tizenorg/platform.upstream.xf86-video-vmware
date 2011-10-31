@@ -671,6 +671,86 @@ drv_set_master(ScrnInfoPtr pScrn)
     return TRUE;
 }
 
+/**
+ * vmwgfx_use_hw_cursor_argb - wrapper around hw argb cursor check.
+ *
+ * screen: Pointer to the current screen metadata.
+ * cursor: Pointer to the current cursor metadata.
+ *
+ * In addition to the default test, also check whether we might be
+ * needing more than one hw cursor (which we don't support).
+ */
+static Bool
+vmwgfx_use_hw_cursor_argb(ScreenPtr screen, CursorPtr cursor)
+{
+    ScrnInfoPtr pScrn = xf86Screens[screen->myNum];
+    xf86CrtcConfigPtr xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
+    xf86CursorInfoPtr cursor_info = xf86_config->cursor_info;
+    modesettingPtr ms = modesettingPTR(pScrn);
+    Bool ret;
+
+    vmwgfx_swap(ms, cursor_info, UseHWCursorARGB);
+    ret = cursor_info->UseHWCursorARGB(screen, cursor);
+    vmwgfx_swap(ms, cursor_info, UseHWCursorARGB);
+    if (!ret)
+	return FALSE;
+
+    /*
+     * If there is a chance we might need two cursors,
+     * revert to sw cursor.
+     */
+    return !vmwgfx_output_explicit_overlap(pScrn);
+}
+
+/**
+ * vmwgfx_use_hw_cursor - wrapper around hw cursor check.
+ *
+ * screen: Pointer to the current screen metadata.
+ * cursor: Pointer to the current cursor metadata.
+ *
+ * In addition to the default test, also check whether we might be
+ * needing more than one hw cursor (which we don't support).
+ */
+static Bool
+vmwgfx_use_hw_cursor(ScreenPtr screen, CursorPtr cursor)
+{
+    ScrnInfoPtr pScrn = xf86Screens[screen->myNum];
+    xf86CrtcConfigPtr xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
+    xf86CursorInfoPtr cursor_info = xf86_config->cursor_info;
+    modesettingPtr ms = modesettingPTR(pScrn);
+    Bool ret;
+
+    vmwgfx_swap(ms, cursor_info, UseHWCursor);
+    ret = cursor_info->UseHWCursor(screen, cursor);
+    vmwgfx_swap(ms, cursor_info, UseHWCursor);
+    if (!ret)
+	return FALSE;
+
+    /*
+     * If there is a chance we might need two simultaneous cursors,
+     * revert to sw cursor.
+     */
+    return !vmwgfx_output_explicit_overlap(pScrn);
+}
+
+/**
+ * vmwgfx_wrap_use_hw_cursor - Wrap functions that check for hw cursor
+ * support.
+ *
+ * pScrn: Pointer to current screen info.
+ *
+ * Enables the device-specific hw cursor support check functions.
+ */
+static void vmwgfx_wrap_use_hw_cursor(ScrnInfoPtr pScrn)
+{
+    xf86CrtcConfigPtr   xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
+    xf86CursorInfoPtr	cursor_info = xf86_config->cursor_info;
+    modesettingPtr ms = modesettingPTR(pScrn);
+
+    vmwgfx_wrap(ms, cursor_info, UseHWCursor, vmwgfx_use_hw_cursor);
+    vmwgfx_wrap(ms, cursor_info, UseHWCursorARGB, vmwgfx_use_hw_cursor_argb);
+}
+
 
 static void drv_load_palette(ScrnInfoPtr pScrn, int numColors,
 			     int *indices, LOCO *colors, VisualPtr pVisual)
@@ -865,11 +945,13 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     miDCInitialize(pScreen, xf86GetPointerScreenFuncs());
 
     /* Need to extend HWcursor support to handle mask interleave */
-    if (!ms->SWCursor)
+    if (!ms->SWCursor) {
 	xf86_cursors_init(pScreen, 64, 64,
 			  HARDWARE_CURSOR_SOURCE_MASK_INTERLEAVE_64 |
 			  HARDWARE_CURSOR_ARGB |
 			  HARDWARE_CURSOR_UPDATE_UNHIDDEN);
+	vmwgfx_wrap_use_hw_cursor(pScrn);
+    }
 
     /* Must force it before EnterVT, so we are in control of VT and
      * later memory should be bound when allocating, e.g rotate_mem */
