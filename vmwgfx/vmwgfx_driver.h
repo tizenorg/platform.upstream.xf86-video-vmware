@@ -87,7 +87,6 @@ typedef struct _modesettingRec
 
     /* Accel */
     Bool accelerate_2d;
-    Bool debug_fallback;
 
     Bool noAccel;
     Bool SWCursor;

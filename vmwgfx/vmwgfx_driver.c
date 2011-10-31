@@ -105,18 +105,12 @@ typedef enum
 {
     OPTION_SW_CURSOR,
     OPTION_2D_ACCEL,
-    OPTION_DEBUG_FALLBACK,
-    OPTION_THROTTLE_SWAP,
-    OPTION_THROTTLE_DIRTY,
     OPTION_3D_ACCEL
 } drv_option_enums;
 
 static const OptionInfoRec drv_options[] = {
     {OPTION_SW_CURSOR, "SWcursor", OPTV_BOOLEAN, {0}, FALSE},
     {OPTION_2D_ACCEL, "2DAccel", OPTV_BOOLEAN, {0}, FALSE},
-    {OPTION_DEBUG_FALLBACK, "DebugFallback", OPTV_BOOLEAN, {0}, FALSE},
-    {OPTION_THROTTLE_SWAP, "SwapThrottling", OPTV_BOOLEAN, {0}, FALSE},
-    {OPTION_THROTTLE_DIRTY, "DirtyThrottling", OPTV_BOOLEAN, {0}, FALSE},
     {OPTION_3D_ACCEL, "3DAccel", OPTV_BOOLEAN, {0}, FALSE},
     {-1, NULL, OPTV_NONE, {0}, FALSE}
 };
@@ -869,8 +863,6 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     xf86SetBlackWhitePixels(pScreen);
 
     ms->accelerate_2d = xf86ReturnOptValBool(ms->Options, OPTION_2D_ACCEL, FALSE);
-    ms->debug_fallback = xf86ReturnOptValBool(ms->Options, OPTION_DEBUG_FALLBACK, ms->accelerate_2d);
-
     vmw_ctrl_ext_init(pScrn);
 
     ms->xat = xa_tracker_create(ms->fd);
@@ -930,8 +922,6 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Using libkms backend.\n");
     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "2D Acceleration is %s.\n",
 	       ms->accelerate_2d ? "enabled" : "disabled");
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Fallback debugging is %s.\n",
-	       ms->debug_fallback ? "enabled" : "disabled");
 #ifdef DRI2
     xf86DrvMsg(pScrn->scrnIndex, ms->from_3D, "3D Acceleration is disabled.\n");
 #else
