@@ -61,8 +61,7 @@ struct vmwgfx_saa_pixmap {
     enum xa_formats staging_format;
 };
 
-struct vmwgfx_screen_box {
-    BoxRec box;
+struct vmwgfx_screen_entry {
     struct _WsbmListHead scanout_head;
     PixmapPtr pixmap;
 };
@@ -84,10 +83,10 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
 		void (*present_flush)(ScreenPtr pScreen));
 
 extern uint32_t
-vmwgfx_scanout_ref(struct vmwgfx_screen_box *box);
+vmwgfx_scanout_ref(struct vmwgfx_screen_entry *box);
 
 extern void
-vmwgfx_scanout_unref(struct vmwgfx_screen_box *box);
+vmwgfx_scanout_unref(struct vmwgfx_screen_entry *box);
 
 extern void
 vmwgfx_scanout_refresh(PixmapPtr pixmap);

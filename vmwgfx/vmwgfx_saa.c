@@ -220,8 +220,6 @@ vmwgfx_pixmap_present_readback(struct vmwgfx_saa *vsaa,
     struct saa_pixmap *spix = saa_get_saa_pixmap(pixmap);
     struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
     RegionRec intersection;
-    RegionRec screen_intersection;
-    struct _WsbmListHead *list;
 
     if (!spix->damage || !REGION_NOTEMPTY(vsaa->pScreen, &spix->dirty_hw) ||
 	!vpix->dirty_present)
@@ -249,38 +247,16 @@ vmwgfx_pixmap_present_readback(struct vmwgfx_saa *vsaa,
     if (!vmwgfx_pixmap_create_gmr(vsaa, pixmap))
 	goto out_err;
 
-    /*
-     * Readback regions are not allowed to cross screen boundaries, so
-     * loop over all scanouts and make sure all readback calls are completely
-     * contained within a scanout bounding box.
-     */
+    if (vmwgfx_present_readback(vsaa->drm_fd, vpix->fb_id,
+				&intersection) != 0)
+	goto out_err;
 
-    REGION_NULL(vsaa->pScreen, &screen_intersection);
-    WSBMLISTFOREACH(list, &vpix->scanout_list) {
-	struct vmwgfx_screen_box *box =
-	    WSBMLISTENTRY(list, struct vmwgfx_screen_box, scanout_head);
-
-	REGION_RESET(vsaa->pScreen, &screen_intersection, &box->box);
-	REGION_INTERSECT(vsaa->pScreen, &screen_intersection,
-			 &screen_intersection, &intersection);
-
-	if (vmwgfx_present_readback(vsaa->drm_fd, vpix->fb_id,
-				    &intersection) != 0)
-	    goto out_readback_err;
-
-	REGION_SUBTRACT(vsaa->pScreen, &intersection, &intersection,
-			&screen_intersection);
-	REGION_SUBTRACT(vsaa->pScreen, &spix->dirty_hw,
-			&spix->dirty_hw, &screen_intersection);
-    }
-
-    REGION_UNINIT(vsaa->pScreen, &screen_intersection);
+    REGION_SUBTRACT(vsaa->pScreen, &spix->dirty_hw,
+		    &spix->dirty_hw, &intersection);
   out:
     REGION_UNINIT(vsaa->pScreen, &intersection);
     return TRUE;
 
-  out_readback_err:
-    REGION_UNINIT(vsaa->pScreen, &screen_intersection);
   out_err:
     REGION_UNINIT(vsaa->pScreen, &intersection);
     return FALSE;
@@ -1367,9 +1343,9 @@ vmwgfx_scanout_refresh(PixmapPtr pixmap)
  */
 
 uint32_t
-vmwgfx_scanout_ref(struct vmwgfx_screen_box  *box)
+vmwgfx_scanout_ref(struct vmwgfx_screen_entry  *entry)
 {
-    PixmapPtr pixmap = box->pixmap;
+    PixmapPtr pixmap = entry->pixmap;
     struct vmwgfx_saa *vsaa =
 	to_vmwgfx_saa(saa_get_driver(pixmap->drawable.pScreen));
     struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(pixmap);
@@ -1389,14 +1365,14 @@ vmwgfx_scanout_ref(struct vmwgfx_screen_box  *box)
 			       vpix->gmr->handle,
 			       &vpix->fb_id);
 	if (ret) {
-	    box->pixmap = NULL;
+	    entry->pixmap = NULL;
 	    vpix->fb_id = -1;
 	    goto out_err;
 	}
 
     }
     pixmap->refcnt += 1;
-    WSBMLISTADDTAIL(&box->scanout_head, &vpix->scanout_list);
+    WSBMLISTADDTAIL(&entry->scanout_head, &vpix->scanout_list);
 
   out_err:
     return vpix->fb_id;
@@ -1408,18 +1384,18 @@ vmwgfx_scanout_ref(struct vmwgfx_screen_box  *box)
  * damage tracking and kms fbs.
  */
 void
-vmwgfx_scanout_unref(struct vmwgfx_screen_box *box)
+vmwgfx_scanout_unref(struct vmwgfx_screen_entry *entry)
 {
     struct vmwgfx_saa *vsaa;
     struct vmwgfx_saa_pixmap *vpix;
-    PixmapPtr pixmap = box->pixmap;
+    PixmapPtr pixmap = entry->pixmap;
 
     if (!pixmap)
 	return;
 
     vsaa = to_vmwgfx_saa(saa_get_driver(pixmap->drawable.pScreen));
     vpix = vmwgfx_saa_pixmap(pixmap);
-    WSBMLISTDELINIT(&box->scanout_head);
+    WSBMLISTDELINIT(&entry->scanout_head);
 
     if (WSBMLISTEMPTY(&vpix->scanout_list)) {
 	REGION_EMPTY(vsaa->pScreen, vpix->pending_update);
@@ -1430,6 +1406,6 @@ vmwgfx_scanout_unref(struct vmwgfx_screen_box *box)
 	vmwgfx_pixmap_remove_damage(pixmap);
     }
 
-    box->pixmap = NULL;
+    entry->pixmap = NULL;
     pixmap->drawable.pScreen->DestroyPixmap(pixmap);
 }

@@ -62,7 +62,7 @@ struct crtc_private
     unsigned cursor_handle;
 
     /* Scanout info for pixmaps */
-    struct vmwgfx_screen_box box;
+    struct vmwgfx_screen_entry entry;
 };
 
 static void
@@ -89,8 +89,8 @@ crtc_dpms(xf86CrtcPtr crtc, int mode)
        * the crtc may be turned on again by
        * another dpms call, so don't release the scanout pixmap ref.
        */
-	if (!crtc->enabled && crtcp->box.pixmap) {
-	    vmwgfx_scanout_unref(&crtcp->box);
+	if (!crtc->enabled && crtcp->entry.pixmap) {
+	    vmwgfx_scanout_unref(&crtcp->entry);
 	}
 	break;
     }
@@ -134,7 +134,6 @@ crtc_set_mode_major(xf86CrtcPtr crtc, DisplayModePtr mode,
     int i, ret;
     unsigned int connector_id;
     PixmapPtr pixmap;
-    BoxPtr screen_box;
 
     for (i = 0; i < config->num_output; output = NULL, i++) {
 	output = config->output[i];
@@ -187,12 +186,12 @@ crtc_set_mode_major(xf86CrtcPtr crtc, DisplayModePtr mode,
     } else
 	pixmap = pScreen->GetScreenPixmap(pScreen);
 
-    if (crtcp->box.pixmap != pixmap) {
-	if (crtcp->box.pixmap)
-	    vmwgfx_scanout_unref(&crtcp->box);
+    if (crtcp->entry.pixmap != pixmap) {
+	if (crtcp->entry.pixmap)
+	    vmwgfx_scanout_unref(&crtcp->entry);
 
-	crtcp->box.pixmap = pixmap;
-	crtcp->scanout_id = vmwgfx_scanout_ref(&crtcp->box);
+	crtcp->entry.pixmap = pixmap;
+	crtcp->scanout_id = vmwgfx_scanout_ref(&crtcp->entry);
 	if (crtcp->scanout_id == -1) {
 	    LogMessage(X_ERROR, "Failed to convert pixmap to scanout.\n");
 	    return FALSE;
@@ -202,12 +201,6 @@ crtc_set_mode_major(xf86CrtcPtr crtc, DisplayModePtr mode,
 			 &connector_id, 1, &drm_mode);
     if (ret)
 	return FALSE;
-
-    screen_box = &crtcp->box.box;
-    screen_box->x1 = crtc->x;
-    screen_box->y1 = crtc->y;
-    screen_box->x2 = screen_box->x1 + mode->HDisplay;
-    screen_box->y2 = screen_box->y1 + mode->VDisplay;
 
     vmwgfx_scanout_refresh(pixmap);
 
@@ -380,8 +373,8 @@ crtc_destroy(xf86CrtcPtr crtc)
 {
     struct crtc_private *crtcp = crtc->driver_private;
 
-    if (!WSBMLISTEMPTY(&crtcp->box.scanout_head))
-	vmwgfx_scanout_unref(&crtcp->box);
+    if (!WSBMLISTEMPTY(&crtcp->entry.scanout_head))
+	vmwgfx_scanout_unref(&crtcp->entry);
 
     xorg_crtc_cursor_destroy(crtc);
 
@@ -442,8 +435,8 @@ xorg_crtc_init(ScrnInfoPtr pScrn)
 	}
 
 	crtcp->drm_crtc = drm_crtc;
-	crtcp->box.pixmap = NULL;
-	WSBMINITLISTHEAD(&crtcp->box.scanout_head);
+	crtcp->entry.pixmap = NULL;
+	WSBMINITLISTHEAD(&crtcp->entry.scanout_head);
 
 	crtc->driver_private = crtcp;
     }
@@ -456,7 +449,7 @@ PixmapPtr
 crtc_get_scanout(xf86CrtcPtr crtc)
 {
     struct crtc_private *crtcp = crtc->driver_private;
-    return crtcp->box.pixmap;
+    return crtcp->entry.pixmap;
 }
 
 /* vim: set sw=4 ts=8 sts=4: */
