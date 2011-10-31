@@ -86,13 +86,12 @@ typedef struct _modesettingRec
     struct pci_device *PciInfo;
 
     /* Accel */
-    Bool accelerate_2d;
-
-    Bool noAccel;
+    Bool accelerate_render;
+    Bool from_render;
     Bool SWCursor;
     CursorPtr cursor;
-    Bool no3D;
-    Bool from_3D;
+    Bool enable_dri;
+    Bool from_dri;
     Bool isMaster;
 
     /* Broken-out options. */

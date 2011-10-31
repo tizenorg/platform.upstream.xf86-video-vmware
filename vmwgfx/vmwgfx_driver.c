@@ -104,14 +104,14 @@ extern const OptionInfoRec * xorg_tracker_available_options(int chipid,
 typedef enum
 {
     OPTION_SW_CURSOR,
-    OPTION_2D_ACCEL,
-    OPTION_3D_ACCEL
+    OPTION_RENDER_ACCEL,
+    OPTION_DRI
 } drv_option_enums;
 
 static const OptionInfoRec drv_options[] = {
     {OPTION_SW_CURSOR, "SWcursor", OPTV_BOOLEAN, {0}, FALSE},
-    {OPTION_2D_ACCEL, "2DAccel", OPTV_BOOLEAN, {0}, FALSE},
-    {OPTION_3D_ACCEL, "3DAccel", OPTV_BOOLEAN, {0}, FALSE},
+    {OPTION_RENDER_ACCEL, "RenderAccel", OPTV_BOOLEAN, {0}, FALSE},
+    {OPTION_DRI, "DRI", OPTV_BOOLEAN, {0}, FALSE},
     {-1, NULL, OPTV_NONE, {0}, FALSE}
 };
 
@@ -295,7 +295,6 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     rgb defaultWeight = { 0, 0, 0 };
     EntityInfoPtr pEnt;
     EntPtr msEnt = NULL;
-    Bool use3D;
 
     if (pScrn->numEntities != 1)
 	return FALSE;
@@ -401,12 +400,15 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     memcpy(ms->Options, drv_options, sizeof(drv_options));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, ms->Options);
 
-    use3D = TRUE;
-    ms->from_3D = xf86GetOptValBool(ms->Options, OPTION_3D_ACCEL,
-				    &use3D) ?
+    ms->accelerate_render = TRUE;
+    ms->from_render = xf86GetOptValBool(ms->Options, OPTION_RENDER_ACCEL,
+					&ms->accelerate_render) ?
 	X_CONFIG : X_PROBED;
 
-    ms->no3D = !use3D;
+    ms->enable_dri = ms->accelerate_render;
+    ms->from_dri = xf86GetOptValBool(ms->Options, OPTION_DRI,
+				     &ms->enable_dri) ?
+	X_CONFIG : X_PROBED;
 
     /* Allocate an xf86CrtcConfig */
     xf86CrtcConfigInit(pScrn, &crtc_config_funcs);
@@ -862,42 +864,47 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
     xf86SetBlackWhitePixels(pScreen);
 
-    ms->accelerate_2d = xf86ReturnOptValBool(ms->Options, OPTION_2D_ACCEL, FALSE);
     vmw_ctrl_ext_init(pScrn);
 
-    ms->xat = xa_tracker_create(ms->fd);
-    if (!ms->xat)
-	xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-		   "Failed to initialize Gallium3D Xa. No 3D available.\n");
-    else {
-	int major, minor, patch;
+    if (ms->accelerate_render) {
+	ms->xat = xa_tracker_create(ms->fd);
+	if (!ms->xat) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		       "Failed to initialize Gallium3D Xa. "
+                       "No render acceleration available.\n");
+	    ms->from_render = X_PROBED;
+	} else {
+	    int major, minor, patch;
 
-	xa_tracker_version(&major, &minor, &patch);
-	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-		   "Gallium3D XA version: %d.%d.%d.\n",
-		   major, minor, patch);
+	    xa_tracker_version(&major, &minor, &patch);
+	    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+		       "Gallium3D XA version: %d.%d.%d.\n",
+		       major, minor, patch);
 
-	if (XA_TRACKER_VERSION_MAJOR == 0) {
-	    if (minor != XA_TRACKER_VERSION_MINOR) {
+	    if (XA_TRACKER_VERSION_MAJOR == 0) {
+		if (minor != XA_TRACKER_VERSION_MINOR) {
+		    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+			       "Expecting XA version 0.%d.x.\n",
+			       XA_TRACKER_VERSION_MINOR);
+		    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+			       "No render acceleration available.\n");
+		    xa_tracker_destroy(ms->xat);
+		    ms->xat = NULL;
+		    ms->from_render = X_PROBED;
+		}
+	    } else if (major != XA_TRACKER_VERSION_MAJOR ||
+		       minor < XA_VERSION_MINOR_REQUIRED) {
 		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-			   "Expecting XA version 0.%d.x.\n",
-			   XA_TRACKER_VERSION_MINOR);
+			   "Expecting %d.%d.x >= XA version < %d.0.0.\n",
+			   XA_TRACKER_VERSION_MAJOR,
+			   XA_VERSION_MINOR_REQUIRED,
+			   XA_TRACKER_VERSION_MAJOR + 1);
 		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-			   "No 3D available.\n");
+			   "No render acceleration available.\n");
 		xa_tracker_destroy(ms->xat);
 		ms->xat = NULL;
+		ms->from_render = X_PROBED;
 	    }
-	} else if (major != XA_TRACKER_VERSION_MAJOR ||
-		   minor < XA_VERSION_MINOR_REQUIRED) {
-	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-		       "Expecting %d.%d.x >= XA version < %d.0.0.\n",
-		       XA_TRACKER_VERSION_MAJOR,
-		       XA_VERSION_MINOR_REQUIRED,
-		       XA_TRACKER_VERSION_MAJOR + 1);
-	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-		       "No 3D available.\n");
-	    xa_tracker_destroy(ms->xat);
-	    ms->xat = NULL;
 	}
     }
 
@@ -907,27 +914,25 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
 #ifdef DRI2
     ms->dri2_available = FALSE;
-    if (ms->xat) {
-	ms->dri2_available = xorg_dri2_init(pScreen);
-	if (!ms->dri2_available)
-	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-		       "Failed to initialize DRI2. "
-		       "No direct rendring available.\n");
+    if (ms->enable_dri) {
+	if (ms->xat) {
+	    ms->dri2_available = xorg_dri2_init(pScreen);
+	    if (!ms->dri2_available)
+		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+			   "Failed to initialize direct rendering.\n");
+	} else {
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		       "Skipped initialization of direct rendering due "
+		       "to lack of render acceleration.\n");
+	    ms->from_dri = X_PROBED;
+	}
     }
 #endif
 
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "#################################\n");
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "# Useful debugging info follows #\n");
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "#################################\n");
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Using libkms backend.\n");
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "2D Acceleration is %s.\n",
-	       ms->accelerate_2d ? "enabled" : "disabled");
-#ifdef DRI2
-    xf86DrvMsg(pScrn->scrnIndex, ms->from_3D, "3D Acceleration is disabled.\n");
-#else
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "3D Acceleration is disabled.\n");
-#endif
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "##################################\n");
+    xf86DrvMsg(pScrn->scrnIndex, ms->from_render, "Render acceleration is %s.\n",
+	       (ms->xat != NULL) ? "enabled" : "disabled");
+    xf86DrvMsg(pScrn->scrnIndex, ms->from_dri, "Direct rendering (3D) is %s.\n",
+	       (ms->dri2_available) ? "enabled" : "disabled");
 
     miInitializeBackingStore(pScreen);
     xf86SetBackingStore(pScreen);
