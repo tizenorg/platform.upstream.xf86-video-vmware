@@ -35,7 +35,7 @@
 #include "vmwgfx_saa_priv.h"
 
 static Bool
-vmwgfx_pixmap_add_damage(PixmapPtr pixmap)
+vmwgfx_pixmap_add_damage(PixmapPtr pixmap, Bool dirty_as_hw)
 {
     struct saa_pixmap *spix = saa_get_saa_pixmap(pixmap);
     struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
@@ -53,7 +53,7 @@ vmwgfx_pixmap_add_damage(PixmapPtr pixmap)
     box.y1 = 0;
     box.y2 = draw->height;
 
-    if (vpix->hw) {
+    if (dirty_as_hw && vpix->hw) {
 	REGION_INIT(draw->pScreen, &spix->dirty_hw, &box, 1);
     } else {
 	REGION_INIT(draw->pScreen, &spix->dirty_shadow, &box, 1);
@@ -114,7 +114,14 @@ vmwgfx_pixmap_add_present(PixmapPtr pixmap, Bool present_opt)
     vpix->pending_present = REGION_CREATE(pScreen, NULL, 0);
     if (!vpix->pending_present)
 	goto out_no_pending_present;
-    if (!vmwgfx_pixmap_add_damage(pixmap))
+
+    /*
+     * We're not creating new storage here, so if there isn't already
+     * a damage tracker attached, there is either only sw storage or
+     * only hw storage, and we use that fact to determine where to put
+     * the initial dirty region.
+     */
+    if (!vmwgfx_pixmap_add_damage(pixmap, vpix->hw != NULL))
 	goto out_no_damage;
 
     return TRUE;
@@ -172,7 +179,7 @@ vmwgfx_pixmap_create_gmr(struct vmwgfx_saa *vsaa, PixmapPtr pixmap)
 	memcpy(addr, vpix->malloc, size);
 	vmwgfx_dmabuf_unmap(gmr);
 
-    } else if (vpix->hw && !vmwgfx_pixmap_add_damage(pixmap))
+    } else if (vpix->hw && !vmwgfx_pixmap_add_damage(pixmap, TRUE))
 	goto out_no_transfer;
 
     vpix->backing |= VMWGFX_PIX_GMR;
@@ -198,11 +205,20 @@ vmwgfx_pixmap_create_sw(struct vmwgfx_saa *vsaa, PixmapPtr pixmap)
 
     if (!vpix->malloc && (vpix->backing & VMWGFX_PIX_MALLOC)) {
 	vpix->malloc = malloc(pixmap->devKind * pixmap->drawable.height);
-	return (vpix->malloc != NULL);
+	if (!vpix->malloc)
+	    goto out_no_malloc;
+	if (!vmwgfx_pixmap_add_damage(pixmap, TRUE))
+	    goto out_no_damage;
     } else if (vpix->backing & VMWGFX_PIX_GMR)
 	return vmwgfx_pixmap_create_gmr(vsaa, pixmap);
 
     return TRUE;
+
+  out_no_damage:
+    free(vpix->malloc);
+    vpix->malloc = NULL;
+  out_no_malloc:
+    return FALSE;
 }
 
 
@@ -624,7 +640,6 @@ vmwgfx_modify_pixmap_header (PixmapPtr pixmap, int w, int h, int depth,
 	vpix->backing = VMWGFX_PIX_MALLOC;
 
     vmwgfx_pix_resize(pixmap, old_pitch, old_height, old_width);
-    vmwgfx_pixmap_add_damage(pixmap);
     vmwgfx_pixmap_free_storage(vpix);
     return TRUE;
 
@@ -728,7 +743,7 @@ vmwgfx_create_hw(struct vmwgfx_saa *vsaa,
 
     vpix->xa_flags = new_flags;
 
-    if ((vpix->gmr || vpix->malloc) && !vmwgfx_pixmap_add_damage(pixmap))
+    if ((vpix->gmr || vpix->malloc) && !vmwgfx_pixmap_add_damage(pixmap, FALSE))
 	goto out_no_damage;
 
     /*
