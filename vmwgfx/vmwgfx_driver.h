@@ -92,7 +92,10 @@ typedef struct _modesettingRec
     CursorPtr cursor;
     Bool enable_dri;
     Bool from_dri;
+    Bool direct_presents;
+    Bool from_dp;
     Bool isMaster;
+
 
     /* Broken-out options. */
     OptionInfoPtr Options;

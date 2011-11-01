@@ -1270,7 +1270,8 @@ static const struct saa_driver vmwgfx_saa_driver = {
 
 Bool
 vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
-		void (*present_flush)(ScreenPtr pScreen))
+		void (*present_flush)(ScreenPtr pScreen),
+		Bool direct_presents)
 {
     struct vmwgfx_saa *vsaa;
 
@@ -1285,7 +1286,7 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
     vsaa->drm_fd = drm_fd;
     vsaa->present_flush = present_flush;
     vsaa->can_optimize_dma = FALSE;
-    vsaa->use_present_opt = TRUE;
+    vsaa->use_present_opt = direct_presents;
     vsaa->only_hw_presents = FALSE;
     WSBMINITLISTHEAD(&vsaa->sync_x_list);
 

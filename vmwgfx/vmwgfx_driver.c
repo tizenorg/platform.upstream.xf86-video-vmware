@@ -105,13 +105,15 @@ typedef enum
 {
     OPTION_SW_CURSOR,
     OPTION_RENDER_ACCEL,
-    OPTION_DRI
+    OPTION_DRI,
+    OPTION_DIRECT_PRESENTS,
 } drv_option_enums;
 
 static const OptionInfoRec drv_options[] = {
     {OPTION_SW_CURSOR, "SWcursor", OPTV_BOOLEAN, {0}, FALSE},
     {OPTION_RENDER_ACCEL, "RenderAccel", OPTV_BOOLEAN, {0}, FALSE},
     {OPTION_DRI, "DRI", OPTV_BOOLEAN, {0}, FALSE},
+    {OPTION_DIRECT_PRESENTS, "DirectPresents", OPTV_BOOLEAN, {0}, FALSE},
     {-1, NULL, OPTV_NONE, {0}, FALSE}
 };
 
@@ -409,6 +411,11 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     ms->from_dri = xf86GetOptValBool(ms->Options, OPTION_DRI,
 				     &ms->enable_dri) ?
 	X_CONFIG : X_PROBED;
+
+    ms->direct_presents = FALSE;
+    ms->from_dp = xf86GetOptValBool(ms->Options, OPTION_DIRECT_PRESENTS,
+				    &ms->direct_presents) ?
+	X_CONFIG : X_DEFAULT;
 
     /* Allocate an xf86CrtcConfig */
     xf86CrtcConfigInit(pScrn, &crtc_config_funcs);
@@ -908,7 +915,8 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	}
     }
 
-    if (!vmwgfx_saa_init(pScreen, ms->fd, ms->xat, &xorg_flush)) {
+    if (!vmwgfx_saa_init(pScreen, ms->fd, ms->xat, &xorg_flush,
+			 ms->direct_presents)) {
 	FatalError("Failed to initialize SAA.\n");
     }
 
@@ -933,6 +941,10 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	       (ms->xat != NULL) ? "enabled" : "disabled");
     xf86DrvMsg(pScrn->scrnIndex, ms->from_dri, "Direct rendering (3D) is %s.\n",
 	       (ms->dri2_available) ? "enabled" : "disabled");
+    if (ms->xat != NULL) {
+	xf86DrvMsg(pScrn->scrnIndex, ms->from_dp, "Direct presents are %s.\n",
+		   (ms->direct_presents) ? "enabled" : "disabled");
+    }
 
     miInitializeBackingStore(pScreen);
     xf86SetBackingStore(pScreen);
