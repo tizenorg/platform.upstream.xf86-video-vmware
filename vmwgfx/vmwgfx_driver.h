@@ -94,6 +94,8 @@ typedef struct _modesettingRec
     Bool from_dri;
     Bool direct_presents;
     Bool from_dp;
+    Bool only_hw_presents;
+    Bool from_hwp;
     Bool isMaster;
 
 

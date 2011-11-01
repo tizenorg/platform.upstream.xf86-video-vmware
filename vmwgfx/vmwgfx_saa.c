@@ -1194,19 +1194,22 @@ vmwgfx_dirty(struct saa_driver *driver, PixmapPtr pixmap,
     if (WSBMLISTEMPTY(&vpix->scanout_list))
 	return TRUE;
 
+#if 0
+    /*
+     * This code can be enabled to immediately upload scanout sw
+     * contents to the hw surface. Otherwise this is done
+     * just before we call the kms update function for the hw
+     * surface.
+     */
     if (vsaa->only_hw_presents) {
-	if (!vpix->hw) {
-	    if (!vmwgfx_hw_accel_stage(pixmap, 0, XA_FLAG_RENDER_TARGET, 0))
-		return FALSE;
-	    if (!vmwgfx_hw_commit(pixmap))
-		return FALSE;
-	}
 	if (!hw && !vmwgfx_upload_to_hw(&vsaa->driver, pixmap, damage))
 	    return FALSE;
+
 	REGION_SUBTRACT(&vsaa->pScreen, &spix->dirty_shadow,
 			&spix->dirty_shadow, damage);
 	hw = TRUE;
     }
+#endif
 
     /*
      * Is the new scanout damage hw or sw?
@@ -1286,13 +1289,19 @@ static const struct saa_driver vmwgfx_saa_driver = {
 Bool
 vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
 		void (*present_flush)(ScreenPtr pScreen),
-		Bool direct_presents)
+		Bool direct_presents,
+		Bool only_hw_presents)
 {
     struct vmwgfx_saa *vsaa;
 
     vsaa = calloc(1, sizeof(*vsaa));
     if (!vsaa)
 	return FALSE;
+
+    if (xat == NULL) {
+	direct_presents = FALSE;
+	only_hw_presents = FALSE;
+    }
 
     vsaa->pScreen = pScreen;
     vsaa->xat = xat;
@@ -1302,7 +1311,7 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
     vsaa->present_flush = present_flush;
     vsaa->can_optimize_dma = FALSE;
     vsaa->use_present_opt = direct_presents;
-    vsaa->only_hw_presents = FALSE;
+    vsaa->only_hw_presents = only_hw_presents;
     WSBMINITLISTHEAD(&vsaa->sync_x_list);
 
     vsaa->driver = vmwgfx_saa_driver;
@@ -1365,33 +1374,59 @@ vmwgfx_scanout_ref(struct vmwgfx_screen_entry  *entry)
     struct vmwgfx_saa *vsaa =
 	to_vmwgfx_saa(saa_get_driver(pixmap->drawable.pScreen));
     struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(pixmap);
-    int ret;
 
     if (WSBMLISTEMPTY(&vpix->scanout_list)) {
-	ret = !vmwgfx_pixmap_create_gmr(vsaa, pixmap);
-	if (!ret)
-	    ret = !vmwgfx_pixmap_add_present(pixmap, vsaa->use_present_opt);
-	if (!ret)
-	    ret = drmModeAddFB(vsaa->drm_fd,
-			       pixmap->drawable.width,
-			       pixmap->drawable.height,
-			       pixmap->drawable.depth,
-			       pixmap->drawable.bitsPerPixel,
-			       pixmap->devKind,
-			       vpix->gmr->handle,
-			       &vpix->fb_id);
-	if (ret) {
-	    entry->pixmap = NULL;
-	    vpix->fb_id = -1;
-	    goto out_err;
+	uint32_t handle, dummy;
+	unsigned int depth;
+
+	if (vsaa->only_hw_presents) {
+	    /*
+	     * The KMS fb will be a HW surface. Create it, add damage
+	     * and get the handle.
+	     */
+	    if (!vmwgfx_hw_accel_validate(pixmap, 0, XA_FLAG_SCANOUT, 0, NULL))
+		goto out_err;
+	    if (xa_surface_handle(vpix->hw, &handle, &dummy) != 0)
+		goto out_err;
+	    depth = xa_format_depth(xa_surface_format(vpix->hw));
+
+	} else {
+	    /*
+	     * The KMS fb will be a Guest Memory Region. Create it,
+	     * add damage and get the handle.
+	     */
+	    if (!vmwgfx_pixmap_create_gmr(vsaa, pixmap))
+		goto out_err;
+
+	    handle = vpix->gmr->handle;
+	    depth = pixmap->drawable.depth;
+
 	}
 
+        if (!vmwgfx_pixmap_add_present(pixmap, vsaa->use_present_opt))
+	    goto out_no_present;
+
+	if (drmModeAddFB(vsaa->drm_fd,
+			 pixmap->drawable.width,
+			 pixmap->drawable.height,
+			 depth,
+			 pixmap->drawable.bitsPerPixel,
+			 pixmap->devKind,
+			 handle,
+			 &vpix->fb_id) != 0)
+	    goto out_no_fb;;
     }
     pixmap->refcnt += 1;
     WSBMLISTADDTAIL(&entry->scanout_head, &vpix->scanout_list);
-
-  out_err:
     return vpix->fb_id;
+
+  out_no_fb:
+    vmwgfx_pixmap_remove_present(vpix);
+  out_no_present:
+    vmwgfx_pixmap_remove_damage(pixmap);
+  out_err:
+    vpix->fb_id = -1;
+    return -1;
 }
 
 /*

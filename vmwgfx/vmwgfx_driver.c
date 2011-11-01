@@ -107,6 +107,7 @@ typedef enum
     OPTION_RENDER_ACCEL,
     OPTION_DRI,
     OPTION_DIRECT_PRESENTS,
+    OPTION_HW_PRESENTS
 } drv_option_enums;
 
 static const OptionInfoRec drv_options[] = {
@@ -114,6 +115,7 @@ static const OptionInfoRec drv_options[] = {
     {OPTION_RENDER_ACCEL, "RenderAccel", OPTV_BOOLEAN, {0}, FALSE},
     {OPTION_DRI, "DRI", OPTV_BOOLEAN, {0}, FALSE},
     {OPTION_DIRECT_PRESENTS, "DirectPresents", OPTV_BOOLEAN, {0}, FALSE},
+    {OPTION_HW_PRESENTS, "HWPresents", OPTV_BOOLEAN, {0}, FALSE},
     {-1, NULL, OPTV_NONE, {0}, FALSE}
 };
 
@@ -417,6 +419,11 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
 				    &ms->direct_presents) ?
 	X_CONFIG : X_DEFAULT;
 
+    ms->only_hw_presents = FALSE;
+    ms->from_hwp = xf86GetOptValBool(ms->Options, OPTION_HW_PRESENTS,
+				     &ms->only_hw_presents) ?
+	X_CONFIG : X_DEFAULT;
+
     /* Allocate an xf86CrtcConfig */
     xf86CrtcConfigInit(pScrn, &crtc_config_funcs);
     xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
@@ -551,7 +558,7 @@ vmwgfx_scanout_present(ScreenPtr pScreen, int drm_fd,
     }
 
     if (vmwgfx_present(drm_fd, vpix->fb_id, 0, 0, dirty, handle) != 0) {
-	LogMessage(X_ERROR, "Could not get present surface handle.\n");
+	LogMessage(X_ERROR, "Failed present kernel call.\n");
 	return FALSE;
     }
 
@@ -610,13 +617,24 @@ void xorg_flush(ScreenPtr pScreen)
 
 	if (vpix->fb_id != -1) {
 	    if (vpix->pending_update) {
-		(void) vmwgfx_scanout_update(ms->fd, vpix->fb_id,
-					     vpix->pending_update);
+		if (ms->only_hw_presents &&
+		    REGION_NOTEMPTY(pscreen, vpix->pending_update)) {
+		    (void) vmwgfx_hw_accel_validate(pixmap, 0, XA_FLAG_SCANOUT,
+						    0, NULL);
+		    REGION_UNION(pScreen, vpix->pending_present,
+				 vpix->pending_present, vpix->pending_update);
+		} else
+		    (void) vmwgfx_scanout_update(ms->fd, vpix->fb_id,
+						 vpix->pending_update);
 		REGION_EMPTY(pScreen, vpix->pending_update);
 	    }
 	    if (vpix->pending_present) {
-		(void) vmwgfx_scanout_present(pScreen, ms->fd, vpix,
-					      vpix->pending_present);
+		if (ms->only_hw_presents)
+		    (void) vmwgfx_scanout_update(ms->fd, vpix->fb_id,
+						 vpix->pending_present);
+		else
+		    (void) vmwgfx_scanout_present(pScreen, ms->fd, vpix,
+						  vpix->pending_present);
 		REGION_EMPTY(pScreen, vpix->pending_present);
 	    }
 	}
@@ -916,7 +934,8 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     }
 
     if (!vmwgfx_saa_init(pScreen, ms->fd, ms->xat, &xorg_flush,
-			 ms->direct_presents)) {
+			 ms->direct_presents,
+			 ms->only_hw_presents)) {
 	FatalError("Failed to initialize SAA.\n");
     }
 
@@ -944,6 +963,9 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     if (ms->xat != NULL) {
 	xf86DrvMsg(pScrn->scrnIndex, ms->from_dp, "Direct presents are %s.\n",
 		   (ms->direct_presents) ? "enabled" : "disabled");
+	xf86DrvMsg(pScrn->scrnIndex, ms->from_hwp, "Hardware only presents "
+		   "are %s.\n",
+		   (ms->only_hw_presents) ? "enabled" : "disabled");
     }
 
     miInitializeBackingStore(pScreen);
