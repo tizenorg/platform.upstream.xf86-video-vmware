@@ -34,8 +34,11 @@
 #include "vmwgfx_drmi.h"
 #include "vmwgfx_saa_priv.h"
 
+/*
+ * Damage to be added as soon as we attach storage to the pixmap.
+ */
 static Bool
-vmwgfx_pixmap_add_damage(PixmapPtr pixmap, Bool dirty_as_hw)
+vmwgfx_pixmap_add_damage(PixmapPtr pixmap)
 {
     struct saa_pixmap *spix = saa_get_saa_pixmap(pixmap);
     struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
@@ -53,10 +56,12 @@ vmwgfx_pixmap_add_damage(PixmapPtr pixmap, Bool dirty_as_hw)
     box.y1 = 0;
     box.y2 = draw->height;
 
-    if (dirty_as_hw && vpix->hw) {
-	REGION_INIT(draw->pScreen, &spix->dirty_hw, &box, 1);
+    if (vpix->hw) {
+	REGION_RESET(draw->pScreen, &spix->dirty_hw, &box);
+	REGION_EMPTY(draw->pScreen, &spix->dirty_shadow);
     } else {
-	REGION_INIT(draw->pScreen, &spix->dirty_shadow, &box, 1);
+	REGION_RESET(draw->pScreen, &spix->dirty_shadow, &box);
+	REGION_EMPTY(draw->pScreen, &spix->dirty_hw);
     }
 
     return TRUE;
@@ -68,7 +73,7 @@ vmwgfx_pixmap_remove_damage(PixmapPtr pixmap)
     struct saa_pixmap *spix = saa_get_saa_pixmap(pixmap);
     struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
 
-    if (!spix->damage || (vpix->hw && vpix->gmr))
+    if (!spix->damage || vpix->hw || vpix->gmr || vpix->malloc)
 	return;
 
     DamageUnregister(&pixmap->drawable, spix->damage);
@@ -115,18 +120,7 @@ vmwgfx_pixmap_add_present(PixmapPtr pixmap, Bool present_opt)
     if (!vpix->pending_present)
 	goto out_no_pending_present;
 
-    /*
-     * We're not creating new storage here, so if there isn't already
-     * a damage tracker attached, there is either only sw storage or
-     * only hw storage, and we use that fact to determine where to put
-     * the initial dirty region.
-     */
-    if (!vmwgfx_pixmap_add_damage(pixmap, vpix->hw != NULL))
-	goto out_no_damage;
-
     return TRUE;
-  out_no_damage:
-    REGION_DESTROY(pScreen, vpix->pending_present);
   out_no_pending_present:
     REGION_DESTROY(pScreen, vpix->pending_update);
   out_no_pending_update:
@@ -179,7 +173,7 @@ vmwgfx_pixmap_create_gmr(struct vmwgfx_saa *vsaa, PixmapPtr pixmap)
 	memcpy(addr, vpix->malloc, size);
 	vmwgfx_dmabuf_unmap(gmr);
 
-    } else if (vpix->hw && !vmwgfx_pixmap_add_damage(pixmap, TRUE))
+    } else if (!vmwgfx_pixmap_add_damage(pixmap))
 	goto out_no_transfer;
 
     vpix->backing |= VMWGFX_PIX_GMR;
@@ -207,7 +201,7 @@ vmwgfx_pixmap_create_sw(struct vmwgfx_saa *vsaa, PixmapPtr pixmap)
 	vpix->malloc = malloc(pixmap->devKind * pixmap->drawable.height);
 	if (!vpix->malloc)
 	    goto out_no_malloc;
-	if (!vmwgfx_pixmap_add_damage(pixmap, TRUE))
+	if (!vmwgfx_pixmap_add_damage(pixmap))
 	    goto out_no_damage;
     } else if (vpix->backing & VMWGFX_PIX_GMR)
 	return vmwgfx_pixmap_create_gmr(vsaa, pixmap);
@@ -534,9 +528,12 @@ vmwgfx_pix_resize(PixmapPtr pixmap, unsigned int old_pitch,
 {
     ScreenPtr pScreen = pixmap->drawable.pScreen;
     struct vmwgfx_saa *vsaa = to_vmwgfx_saa(saa_get_driver(pScreen));
-    struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(pixmap);
+    struct saa_pixmap *spix = saa_get_saa_pixmap(pixmap);
+    struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
     DrawablePtr draw = &pixmap->drawable;
     unsigned int size = pixmap->devKind * draw->height;
+    BoxRec b_box;
+    RegionRec b_reg;
 
     /*
      * Ignore copying errors. At worst they will show up as rendering
@@ -589,6 +586,31 @@ vmwgfx_pix_resize(PixmapPtr pixmap, unsigned int old_pitch,
 				xa_format_unknown, vpix->xa_flags, 1) != 0)
 	    return FALSE;
     }
+
+    b_box.x1 = 0;
+    b_box.x2 = draw->width;
+    b_box.y1 = 0;
+    b_box.y2 = draw->height;
+
+    REGION_INIT(pScreen, &b_reg, &b_box, 1);
+    REGION_INTERSECT(pScreen, &spix->dirty_shadow, &spix->dirty_shadow,
+		     &b_reg);
+    REGION_INTERSECT(pScreen, &spix->dirty_hw, &spix->dirty_hw, &b_reg);
+    if (vpix->dirty_present)
+	REGION_INTERSECT(pScreen, vpix->dirty_present, vpix->dirty_present,
+			 &b_reg);
+    if (vpix->pending_update)
+	REGION_INTERSECT(pScreen, vpix->pending_update, vpix->pending_update,
+			 &b_reg);
+    if (vpix->pending_present)
+	REGION_INTERSECT(pScreen, vpix->pending_present,
+			 vpix->pending_present, &b_reg);
+    if (vpix->present_damage)
+	REGION_INTERSECT(pScreen, vpix->present_damage, vpix->present_damage,
+			 &b_reg);
+
+    REGION_UNINIT(pScreen, &b_reg);
+
     return TRUE;
 }
 
@@ -743,7 +765,7 @@ vmwgfx_create_hw(struct vmwgfx_saa *vsaa,
 
     vpix->xa_flags = new_flags;
 
-    if ((vpix->gmr || vpix->malloc) && !vmwgfx_pixmap_add_damage(pixmap, FALSE))
+    if (!vmwgfx_pixmap_add_damage(pixmap))
 	goto out_no_damage;
 
     /*
