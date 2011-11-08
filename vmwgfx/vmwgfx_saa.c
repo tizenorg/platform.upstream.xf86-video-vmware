@@ -1375,12 +1375,14 @@ vmwgfx_scanout_refresh(PixmapPtr pixmap)
     box.x2 = pixmap->drawable.width;
     box.y2 = pixmap->drawable.height;
 
-    REGION_RESET(vsaa->pScreen, vpix->pending_update, &box);
+    REGION_RESET(vsaa->pScreen, vpix->pending_present, &box);
     if (vpix->dirty_present)
 	REGION_SUBTRACT(vsaa->pScreen, vpix->pending_present,
-			&vpix->base.dirty_hw, vpix->dirty_present);
-    REGION_SUBTRACT(vsaa->pScreen, vpix->pending_update,
-		    vpix->pending_update, &vpix->base.dirty_hw);
+			vpix->pending_present, vpix->dirty_present);
+    REGION_SUBTRACT(vsaa->pScreen, vpix->pending_present,
+		    vpix->pending_present, &vpix->base.dirty_shadow);
+    REGION_COPY(vsaa->pScreen, vpix->pending_update,
+		&vpix->base.dirty_shadow);
 }
 
 /*
