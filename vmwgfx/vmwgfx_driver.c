@@ -652,6 +652,7 @@ static void drv_block_handler(int i, pointer blockData, pointer pTimeout,
     pScreen->BlockHandler(i, blockData, pTimeout, pReadmask);
     vmwgfx_swap(ms, pScreen, BlockHandler);
 
+    vmwgfx_flush_dri2(pScreen);
     xorg_flush(pScreen);
 }
 

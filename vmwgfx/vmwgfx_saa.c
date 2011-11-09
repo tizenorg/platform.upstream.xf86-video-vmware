@@ -460,6 +460,10 @@ vmwgfx_flush_dri2(ScreenPtr pScreen)
     struct vmwgfx_saa *vsaa =
 	to_vmwgfx_saa(saa_get_driver(pScreen));
     struct _WsbmListHead *list, *next;
+    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+
+    if (!pScrn->vtSema)
+	return;
 
     WSBMLISTFOREACHSAFE(list, next, &vsaa->sync_x_list) {
 	struct vmwgfx_saa_pixmap *vpix =
@@ -1179,21 +1183,25 @@ vmwgfx_operation_complete(struct saa_driver *driver,
     struct vmwgfx_saa *vsaa = to_vmwgfx_saa(driver);
     struct saa_pixmap *spix = saa_get_saa_pixmap(pixmap);
     struct vmwgfx_saa_pixmap *vpix = to_vmwgfx_saa_pixmap(spix);
+    ScrnInfoPtr pScrn = xf86Screens[vsaa->pScreen->myNum];
 
     /*
      * Make dri2 drawables up to date, or add them to the flush list
-     * executed at glxWaitX().
+     * executed at glxWaitX(). Currently glxWaitX() is broken, so
+     * we flush immediately, unless we're VT-switched away, in which
+     * case a flush would deadlock in the kernel.
      */
 
     if (vpix->hw && vpix->hw_is_dri2_fronts) {
-	if (1) {
-	    if (!vmwgfx_upload_to_hw(driver, pixmap, &spix->dirty_shadow))
-		return;
+	if (1 && pScrn->vtSema &&
+	    vmwgfx_upload_to_hw(driver, pixmap, &spix->dirty_shadow)) {
+
 	    REGION_EMPTY(vsaa->pScreen, &spix->dirty_shadow);
-	} else {
-	    if (WSBMLISTEMPTY(&vpix->sync_x_head))
-		WSBMLISTADDTAIL(&vpix->sync_x_head, &vsaa->sync_x_list);
+	    return;
 	}
+
+	if (WSBMLISTEMPTY(&vpix->sync_x_head))
+	    WSBMLISTADDTAIL(&vpix->sync_x_head, &vsaa->sync_x_list);
     }
 }
 
