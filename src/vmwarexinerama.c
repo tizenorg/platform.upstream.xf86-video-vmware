@@ -153,9 +153,11 @@ VMwareXineramaGetState(ClientPtr client)
     rep.length = 0;
     rep.sequenceNumber = client->sequence;
     rep.state = pVMWARE->xinerama;
+    rep.window = stuff->window;
     if(client->swapped) {
        _swaps (&rep.sequenceNumber, n);
        _swapl (&rep.length, n);
+       _swapl (&rep.window, n);
     }
     WriteToClient(client, sizeof(xPanoramiXGetStateReply), (char *)&rep);
     return client->noClientException;
@@ -206,9 +208,12 @@ VMwareXineramaGetScreenCount(ClientPtr client)
     rep.length = 0;
     rep.sequenceNumber = client->sequence;
     rep.ScreenCount = pVMWARE->xineramaNumOutputs;
+    rep.window = stuff->window;
+    
     if(client->swapped) {
        _swaps(&rep.sequenceNumber, n);
        _swapl(&rep.length, n);
+       _swapl(&rep.window, n);
     }
     WriteToClient(client, sizeof(xPanoramiXGetScreenCountReply), (char *)&rep);
     return client->noClientException;
@@ -244,6 +249,7 @@ VMwareXineramaGetScreenSize(ClientPtr client)
     VMWAREPtr pVMWARE;
     int rc;
 
+
     REQUEST_SIZE_MATCH(xPanoramiXGetScreenSizeReq);
     rc = dixLookupWindow(&pWin, stuff->window, client, DixGetAttrAccess);
     if (rc != Success)
@@ -260,11 +266,15 @@ VMwareXineramaGetScreenSize(ClientPtr client)
     rep.sequenceNumber = client->sequence;
     rep.width  = pVMWARE->xineramaState[stuff->screen].width;
     rep.height  = pVMWARE->xineramaState[stuff->screen].height;
+    rep.window = stuff->window;
+    rep.screen = stuff->screen;
     if(client->swapped) {
        _swaps(&rep.sequenceNumber, n);
        _swapl(&rep.length, n);
        _swapl(&rep.width, n);
        _swapl(&rep.height, n);
+       _swapl(&rep.window, n);
+       _swapl(&rep.screen, n);
     }
     WriteToClient(client, sizeof(xPanoramiXGetScreenSizeReply), (char *)&rep);
     return client->noClientException;
