@@ -58,6 +58,7 @@
 
 #include <saa.h>
 #include "vmwgfx_saa.h"
+#include "../src/vmware_bootstrap.h"
 
 #define XA_VERSION_MINOR_REQUIRED 0
 #define DRM_VERSION_MAJOR_REQUIRED 2
@@ -97,47 +98,15 @@ static ModeStatus drv_valid_mode(int scrnIndex, DisplayModePtr mode, Bool verbos
 			         int flags);
 
 extern void xorg_tracker_set_functions(ScrnInfoPtr scrn);
-extern const OptionInfoRec * xorg_tracker_available_options(int chipid,
-							   int busid);
-
-
-typedef enum
-{
-    OPTION_SW_CURSOR,
-    OPTION_RENDER_ACCEL,
-    OPTION_DRI,
-    OPTION_DIRECT_PRESENTS,
-    OPTION_HW_PRESENTS
-} drv_option_enums;
-
-static const OptionInfoRec drv_options[] = {
-    {OPTION_SW_CURSOR, "SWcursor", OPTV_BOOLEAN, {0}, FALSE},
-    {OPTION_RENDER_ACCEL, "RenderAccel", OPTV_BOOLEAN, {0}, FALSE},
-    {OPTION_DRI, "DRI", OPTV_BOOLEAN, {0}, FALSE},
-    {OPTION_DIRECT_PRESENTS, "DirectPresents", OPTV_BOOLEAN, {0}, FALSE},
-    {OPTION_HW_PRESENTS, "HWPresents", OPTV_BOOLEAN, {0}, FALSE},
-    {-1, NULL, OPTV_NONE, {0}, FALSE}
-};
-
-
-/*
- * Exported Xorg driver functions to winsys
- */
-
-const OptionInfoRec *
-xorg_tracker_available_options(int chipid, int busid)
-{
-    return drv_options;
-}
 
 void
-xorg_tracker_set_functions(ScrnInfoPtr scrn)
+vmwgfx_hookup(ScrnInfoPtr pScrn)
 {
-    scrn->PreInit = drv_pre_init;
-    scrn->ScreenInit = drv_screen_init;
-    scrn->SwitchMode = drv_switch_mode;
-    scrn->FreeScreen = drv_free_screen;
-    scrn->ValidMode = drv_valid_mode;
+    pScrn->PreInit = drv_pre_init;
+    pScrn->ScreenInit = drv_screen_init;
+    pScrn->SwitchMode = drv_switch_mode;
+    pScrn->FreeScreen = drv_free_screen;
+    pScrn->ValidMode = drv_valid_mode;
 }
 
 /*
@@ -399,9 +368,8 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
 
     /* Process the options */
     xf86CollectOptions(pScrn, NULL);
-    if (!(ms->Options = malloc(sizeof(drv_options))))
+    if (!(ms->Options = VMWARECopyOptions()))
 	return FALSE;
-    memcpy(ms->Options, drv_options, sizeof(drv_options));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, ms->Options);
 
     ms->accelerate_render = TRUE;
@@ -461,7 +429,7 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     }
 
 
-    if (xf86ReturnOptValBool(ms->Options, OPTION_SW_CURSOR, FALSE)) {
+    if (!xf86ReturnOptValBool(ms->Options, OPTION_HW_CURSOR, TRUE)) {
 	ms->SWCursor = TRUE;
     }
 

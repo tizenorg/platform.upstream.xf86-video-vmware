@@ -35,7 +35,12 @@ typedef enum {
     OPTION_HW_CURSOR,
     OPTION_XINERAMA,
     OPTION_STATIC_XINERAMA,
+    OPTION_GUI_LAYOUT,
     OPTION_DEFAULT_MODE,
+    OPTION_RENDER_ACCEL,
+    OPTION_DRI,
+    OPTION_DIRECT_PRESENTS,
+    OPTION_HW_PRESENTS
 } VMWAREOpts;
 
 OptionInfoPtr VMWARECopyOptions(void);
@@ -43,6 +48,11 @@ const char **vgahwSymbols;
 
 void
 vmwlegacy_hookup(ScrnInfoPtr pScrn);
+
+#ifdef BUILD_VMWGFX
+void
+vmwgfx_hookup(ScrnInfoPtr pScrn);
+#endif /* defined(BUILD_VMWGFX) */
 
 
 #endif

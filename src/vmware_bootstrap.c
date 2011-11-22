@@ -81,8 +81,8 @@
 #define VMW_INNERSTRINGIFY(s) #s
 #define VMW_STRING(str) VMW_INNERSTRINGIFY(str)
 
-#define VMWARE_NAME "vmwlegacy"
-#define VMWARE_DRIVER_NAME "vmwlegacy"
+#define VMWARE_NAME "vmware"
+#define VMWARE_DRIVER_NAME "vmware"
 #define VMWARE_DRIVER_VERSION \
    (PACKAGE_VERSION_MAJOR * 65536 + PACKAGE_VERSION_MINOR * 256 + PACKAGE_VERSION_PATCHLEVEL)
 #define VMWARE_DRIVER_VERSION_STRING \
@@ -101,11 +101,11 @@ static const char VMWAREBuildStr[] = "VMware Guest X Server "
 
 #ifdef __GNUC__
 #ifdef VMW_SUBPATCH
-const char vmwlegacy_drv_modinfo[]
+const char vmware_drv_modinfo[]
 __attribute__((section(".modinfo"),unused)) =
   "version=" VMWARE_DRIVER_VERSION_STRING "." VMW_STRING(VMW_SUBPATCH);
 #else
-const char vmwlegacy_drv_modinfo[]
+const char vmware_drv_modinfo[]
 __attribute__((section(".modinfo"),unused)) =
   "version=" VMWARE_DRIVER_VERSION_STRING ".0";
 #endif /*VMW_SUBPATCH*/
@@ -167,7 +167,7 @@ static SymTabRec VMWAREChipsets[] = {
 };
 
 #ifdef XFree86LOADER
-static XF86ModuleVersionInfo vmwlegacyVersRec = {
+static XF86ModuleVersionInfo vmwareVersRec = {
     VMWARE_DRIVER_NAME,
     MODULEVENDORSTRING,
     MODINFOSTRING1,
@@ -185,7 +185,12 @@ static const OptionInfoRec VMWAREOptions[] = {
     { OPTION_HW_CURSOR, "HWcursor",     OPTV_BOOLEAN,   {0},    FALSE },
     { OPTION_XINERAMA,  "Xinerama",     OPTV_BOOLEAN,   {0},    FALSE },
     { OPTION_STATIC_XINERAMA, "StaticXinerama", OPTV_STRING, {0}, FALSE },
+    { OPTION_GUI_LAYOUT, "GuiLayout", OPTV_STRING, {0}, FALSE },
     { OPTION_DEFAULT_MODE, "AddDefaultMode", OPTV_BOOLEAN,   {0},    FALSE },
+    { OPTION_RENDER_ACCEL, "RenderAccel", OPTV_BOOLEAN, {0}, FALSE},
+    { OPTION_DRI, "DRI", OPTV_BOOLEAN, {0}, FALSE},
+    { OPTION_DIRECT_PRESENTS, "DirectPresents", OPTV_BOOLEAN, {0}, FALSE},
+    { OPTION_HW_PRESENTS, "HWPresents", OPTV_BOOLEAN, {0}, FALSE},
     { -1,               NULL,           OPTV_NONE,      {0},    FALSE }
 };
 
@@ -210,7 +215,29 @@ VMwarePreinitStub(ScrnInfoPtr pScrn, int flags)
     EntityInfoPtr pEnt;
 
     pScrn->PreInit = pScrn->driverPrivate;
+
+#ifdef BUILD_VMWGFX
     pScrn->driverPrivate = NULL;
+
+    /*
+     * Try vmwgfx path.
+     */
+    if ((*pScrn->PreInit)(pScrn, flags))
+	return TRUE;
+
+#else
+    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+	       "Driver was compiled without KMS- and 3D support.\n");
+#endif /* defined(BUILD_VMWGFX) */
+    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+	       "Disabling 3D support.\n");
+    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+	       "Disabling Render Acceleration.\n");
+    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+	       "Disabling RandR12+ support.\n");
+
+    pScrn->driverPrivate = NULL;
+    vmwlegacy_hookup(pScrn);
 
     pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
     if (pEnt->location.type != BUS_PCI)
@@ -222,8 +249,6 @@ VMwarePreinitStub(ScrnInfoPtr pScrn, int flags)
 
     pScrn->chipset = (char*)xf86TokenToString(VMWAREChipsets,
 					      DEVICE_ID(pciInfo));
-
-    ErrorF("Stub bitsperpixel is %d\n", pScrn->bitsPerPixel);
 
     return (*pScrn->PreInit)(pScrn, flags);
 };
@@ -252,7 +277,13 @@ VMwarePciProbe (DriverPtr           drv,
     case PCI_CHIP_VMWARE0405:
     case PCI_CHIP_VMWARE0710:
         xf86MsgVerb(X_INFO, 4, "VMwarePciProbe: Valid device\n");
+
+#ifdef BUILD_VMWGFX
+	vmwgfx_hookup(scrn);
+#else
 	vmwlegacy_hookup(scrn);
+#endif /* defined(BUILD_VMWGFX) */
+
 	scrn->driverPrivate = scrn->PreInit;
 	scrn->PreInit = VMwarePreinitStub;
         break;
@@ -308,7 +339,13 @@ VMWAREProbe(DriverPtr drv, int flags)
                     pScrn->name = VMWARE_NAME;
                     pScrn->Probe = VMWAREProbe;
                     pScrn->PreInit = VMWAREPreInit;
+
+#ifdef BUILD_VMWGFX
+		    vmwgfx_hookup(scrn);
+#else
 		    vmwlegacy_hookup(scrn);
+#endif /* defined(BUILD_VMWGFX) */
+
 		    scrn->driverPrivate = scrn->PreInit;
 		    scrn->PreInit = VMwarePreinitStub;
                     foundScreen = TRUE;
@@ -372,7 +409,7 @@ VMWareDriverFunc(ScrnInfoPtr pScrn,
 #endif
 
 
-_X_EXPORT DriverRec vmwlegacy = {
+_X_EXPORT DriverRec vmware = {
     VMWARE_DRIVER_VERSION,
     VMWARE_DRIVER_NAME,
     VMWAREIdentify,
@@ -434,23 +471,23 @@ static const char *shadowfbSymbols[] = {
 #endif
 
 #ifdef XFree86LOADER
-static MODULESETUPPROTO(vmwlegacySetup);
+static MODULESETUPPROTO(vmwareSetup);
 
-_X_EXPORT XF86ModuleData vmwlegacyModuleData = {
-    &vmwlegacyVersRec,
-    vmwlegacySetup,
+_X_EXPORT XF86ModuleData vmwareModuleData = {
+    &vmwareVersRec,
+    vmwareSetup,
     NULL
 };
 
 static pointer
-vmwlegacySetup(pointer module, pointer opts, int *errmaj, int *errmin)
+vmwareSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 {
     static Bool setupDone = FALSE;
 
     if (!setupDone) {
         setupDone = TRUE;
 
-        xf86AddDriver(&vmwlegacy, module, VMWARE_DRIVER_FUNC);
+        xf86AddDriver(&vmware, module, VMWARE_DRIVER_FUNC);
 
         LoaderRefSymLists(vgahwSymbols, fbSymbols, ramdacSymbols,
                           shadowfbSymbols, NULL);

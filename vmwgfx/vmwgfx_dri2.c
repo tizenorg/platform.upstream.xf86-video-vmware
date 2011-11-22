@@ -376,7 +376,7 @@ xorg_dri2_init(ScreenPtr pScreen)
     dri2info.version = min(DRI2INFOREC_VERSION, 3);
     dri2info.fd = ms->fd;
 
-    dri2info.driverName = pScrn->driverName;
+    dri2info.driverName = "vmwgfx";
     dri2info.deviceName = "/dev/dri/card0"; /* FIXME */
 
     dri2info.CreateBuffer = dri2_create_buffer;

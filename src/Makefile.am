@@ -24,12 +24,13 @@
 # _ladir passes a dummy rpath to libtool so the thing will actually link
 # TODO: -nostdlib/-Bstatic/-lgcc platform magic, not installing the .a, etc.
 
-vmwlegacy_drv_la_LTLIBRARIES = vmwlegacy_drv.la
-vmwlegacy_drv_la_LDFLAGS = -module -avoid-version
-vmwlegacy_drv_la_CFLAGS = @XORG_CFLAGS@
-vmwlegacy_drv_ladir = @moduledir@/drivers
+vmware_drv_la_LTLIBRARIES = vmware_drv.la
+vmware_drv_la_LDFLAGS = -module -avoid-version
+vmware_drv_la_CFLAGS = @XORG_CFLAGS@
+vmware_drv_ladir = @moduledir@/drivers
+vmware_drv_la_LIBADD = @VMWGFX_LIBADD@
 
-vmwlegacy_drv_la_SOURCES = \
+vmware_drv_la_SOURCES = \
 	bits2pixels.c \
 	bits2pixels.h \
 	guest_os.h \
@@ -51,13 +52,5 @@ vmwlegacy_drv_la_SOURCES = \
 	vmwarexinerama.c \
 	vmwarevideo.c \
 	vmwaremodes.c \
+	vmware_bootstrap.h \
 	vmware_bootstrap.c
-
-vmware_drv_la_LTLIBRARIES = vmware_drv.la
-vmware_drv_la_LDFLAGS = -module -avoid-version
-vmware_drv_la_CFLAGS = @XORG_CFLAGS@ @LIBDRM_CFLAGS@
-vmware_drv_la_LIBADD = @LIBDRM_LIBS@
-vmware_drv_ladir = @moduledir@/drivers
-
-vmware_drv_la_SOURCES = \
-	vmwaremodule.c

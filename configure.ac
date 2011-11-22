@@ -72,11 +72,6 @@ XORG_DRIVER_CHECK_EXT(XV, videoproto)
 
 # Obtain compiler/linker options for the driver dependencies
 PKG_CHECK_MODULES(XORG, [xorg-server >= 1.0.1 xproto fontsproto $REQUIRED_MODULES])
-PKG_CHECK_MODULES(LIBDRM,
-		  [libdrm],
-		  [AC_DEFINE([HAVE_LIBDRM], 1, [Has libdrm])],
-		  [echo "Will not try support for 3D or kernel modesetting."])
-
 PKG_CHECK_EXISTS([xorg-server >= 1.1.0],
                  [AC_DEFINE([HAVE_XORG_SERVER_1_1_0], 1,
                  [Has version 1.1.0 or greater of the Xserver])])
@@ -115,27 +110,34 @@ AM_CONDITIONAL(XSERVER_LIBPCIACCESS, test "x$XSERVER_LIBPCIACCESS" = xyes)
 AC_SUBST([moduledir])
 
 if test x$BUILD_VMWGFX = xyes; then
+	PKG_CHECK_MODULES([LIBDRM], [libdrm],[],[BUILD_VMWGFX=no])
+fi
+if test x$BUILD_VMWGFX = xyes; then
 	PKG_CHECK_MODULES([XATRACKER], [xatracker >= 0.4.0],[],[BUILD_VMWGFX=no])
 fi
 
 DRIVER_NAME=vmware
 AC_SUBST([DRIVER_NAME])
 
-
+AC_MSG_CHECKING([whether to build Kernel Mode Setting and 3D])
 VMWGFX_DIRS=
 if test x$BUILD_VMWGFX = xyes; then
+	AC_MSG_RESULT([yes])
 	AC_SYS_LARGEFILE
 	VMWGFX_DIRS="saa vmwgfx"
+	VMWGFX_LIBADD='$(top_srcdir)/vmwgfx/libvmwgfx.la'
 	AC_CONFIG_FILES([
 			saa/Makefile
 			vmwgfx/Makefile
 	])
-	echo "Will build the vmwgfx driver."
+        AC_DEFINE([BUILD_VMWGFX], 1,
+                 [Building the vmwgfx driver path])
 else
-	echo "Will not build the vmwgfx driver."
+	AC_MSG_RESULT([no])
 fi
 
 AC_SUBST([VMWGFX_DIRS])
+AC_SUBST([VMWGFX_LIBADD])
 AC_CONFIG_FILES([
                 Makefile
                 src/Makefile
