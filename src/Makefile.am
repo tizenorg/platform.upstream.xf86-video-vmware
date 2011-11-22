@@ -50,7 +50,8 @@ vmwlegacy_drv_la_SOURCES = \
 	vmwarectrlproto.h \
 	vmwarexinerama.c \
 	vmwarevideo.c \
-	vmwaremodes.c
+	vmwaremodes.c \
+	vmware_bootstrap.c
 
 vmware_drv_la_LTLIBRARIES = vmware_drv.la
 vmware_drv_la_LDFLAGS = -module -avoid-version
