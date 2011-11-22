@@ -30,6 +30,7 @@
  */
 
 
+#include <unistd.h>
 #include "xorg-server.h"
 #include "xf86.h"
 #include "xf86_OSproc.h"
@@ -59,6 +60,22 @@
 #include <saa.h>
 #include "vmwgfx_saa.h"
 #include "../src/vmware_bootstrap.h"
+
+/*
+ * We can't incude svga_types.h due to conflicting types for Bool.
+ */
+typedef int64_t int64;
+typedef uint64_t uint64;
+
+typedef int32_t int32;
+typedef uint32_t uint32;
+
+typedef int16_t int16;
+typedef uint16_t uint16;
+
+typedef int8_t int8;
+typedef uint8_t uint8;
+#include "./src/svga_reg.h"
 
 #define XA_VERSION_MINOR_REQUIRED 0
 #define DRM_VERSION_MAJOR_REQUIRED 2
@@ -254,6 +271,9 @@ drv_init_drm(ScrnInfoPtr pScrn)
 	    return TRUE;
 	}
 
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		   "Failed to open drm.\n");
+
 	return FALSE;
     }
 
@@ -267,7 +287,7 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     modesettingPtr ms;
     rgb defaultWeight = { 0, 0, 0 };
     EntityInfoPtr pEnt;
-    EntPtr msEnt = NULL;
+    uint64_t cap;
 
     if (pScrn->numEntities != 1)
 	return FALSE;
@@ -282,43 +302,28 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     pScrn->driverPrivate = NULL;
 
     /* Allocate driverPrivate */
-    if (!drv_get_rec(pScrn))
-	return FALSE;
+    if (!drv_get_rec(pScrn)) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		   "Failed to allocate driver private.\n");
+    }
 
     ms = modesettingPTR(pScrn);
     ms->pEnt = pEnt;
 
     pScrn->displayWidth = 640;	       /* default it */
 
-    if (ms->pEnt->location.type != BUS_PCI)
-	return FALSE;
+    if (ms->pEnt->location.type != BUS_PCI) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		   "Incorrect bus for device.\n");
+	goto out_err_bus;
+    }
 
     ms->PciInfo = xf86GetPciInfoForEntity(ms->pEnt->index);
-
-    /* Allocate an entity private if necessary */
-    if (xf86IsEntityShared(pScrn->entityList[0])) {
-	FatalError("Entity");
-#if 0
-	msEnt = xf86GetEntityPrivate(pScrn->entityList[0],
-				     modesettingEntityIndex)->ptr;
-	ms->entityPrivate = msEnt;
-#else
-	(void)msEnt;
-#endif
-    } else
-	ms->entityPrivate = NULL;
-
-    if (xf86IsEntityShared(pScrn->entityList[0])) {
-	if (xf86IsPrimInitDone(pScrn->entityList[0])) {
-	    /* do something */
-	} else {
-	    xf86SetPrimInitDone(pScrn->entityList[0]);
-	}
-    }
+    xf86SetPrimInitDone(pScrn->entityList[0]);
 
     ms->fd = -1;
     if (!drv_init_drm(pScrn))
-	return FALSE;
+	goto out_err_bus;
 
     if (ms->drm_major != DRM_VERSION_MAJOR_REQUIRED ||
 	ms->drm_minor < DRM_VERSION_MINOR_REQUIRED) {
@@ -326,10 +331,11 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
 		   "DRM driver version is %d.%d.%d\n",
 		   ms->drm_major, ms->drm_minor, ms->drm_patch);
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-		   "But this driver needs %d.%d.x to work. Giving up.\n",
+		   "But KMS- and 3D functionality needs at least "
+		   "%d.%d.0 to work.\n",
 		   DRM_VERSION_MAJOR_REQUIRED,
 		   DRM_VERSION_MINOR_REQUIRED);
-	return FALSE;
+	goto out_drm_version;
     } else {
 	xf86DrvMsg(pScrn->scrnIndex, X_PROBED,
 		   "DRM driver version is %d.%d.%d\n",
@@ -344,32 +350,45 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
 
     if (!xf86SetDepthBpp
 	(pScrn, 0, 0, 0,
-	 PreferConvert24to32 | SupportConvert24to32 | Support32bppFb))
-	return FALSE;
+	 PreferConvert24to32 | SupportConvert24to32 | Support32bppFb)) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Failed to set depth and bpp.\n");
+	goto out_depth;
+    }
+
+    if (vmwgfx_get_param(ms->fd, DRM_VMW_PARAM_HW_CAPS, &cap) != 0) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Failed to detect device "
+		   "screen object capability.\n");
+	goto out_depth;
+    }
+
+    if ((cap & SVGA_CAP_SCREEN_OBJECT_2) == 0) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Device is not screen object "
+		   "capable.\n");
+	goto out_depth;
+    }
 
     switch (pScrn->depth) {
-    case 8:
     case 15:
     case 16:
     case 24:
 	break;
     default:
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-		   "Given depth (%d) is not supported by the driver\n",
+		   "Given depth (%d) is not supported with KMS enabled.\n",
 		   pScrn->depth);
-	return FALSE;
+	goto out_depth;
     }
     xf86PrintDepthBpp(pScrn);
 
     if (!xf86SetWeight(pScrn, defaultWeight, defaultWeight))
-	return FALSE;
+	goto out_depth;
     if (!xf86SetDefaultVisual(pScrn, -1))
-	return FALSE;
+	goto out_depth;
 
     /* Process the options */
     xf86CollectOptions(pScrn, NULL);
     if (!(ms->Options = VMWARECopyOptions()))
-	return FALSE;
+	goto out_depth;
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, ms->Options);
 
     ms->accelerate_render = TRUE;
@@ -405,18 +424,6 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
 	max_width = res->max_width;
 	max_height = res->max_height;
 
-#if 0 /* Gallium fix */
-	if (ms->screen) {
-	    int max;
-
-	    max = ms->screen->get_param(ms->screen,
-					PIPE_CAP_MAX_TEXTURE_2D_LEVELS);
-	    max = 1 << (max - 1);
-	    max_width = max < max_width ? max : max_width;
-	    max_height = max < max_height ? max : max_height;
-	}
-#endif
-
 	xf86CrtcSetSizeRange(pScrn, res->min_width,
 			     res->min_height, max_width, max_height);
 	xf86DrvMsg(pScrn->scrnIndex, X_PROBED,
@@ -439,7 +446,7 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     ms->initialization = TRUE;
     if (!xf86InitialConfiguration(pScrn, TRUE)) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No valid modes.\n");
-	return FALSE;
+	goto out_modes;
     }
     ms->initialization = FALSE;
 
@@ -450,13 +457,14 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
 	Gamma zeros = { 0.0, 0.0, 0.0 };
 
 	if (!xf86SetGamma(pScrn, zeros)) {
-	    return FALSE;
+	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Failed to set gamma.\n");
+	    goto out_modes;
 	}
     }
 
     if (pScrn->modes == NULL) {
-	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No modes.\n");
-	return FALSE;
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No available modes.\n");
+	goto out_modes;
     }
 
     pScrn->currentMode = pScrn->modes;
@@ -465,18 +473,27 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     xf86SetDpi(pScrn, 0, 0);
 
     /* Load the required sub modules */
-    if (!xf86LoadSubModule(pScrn, "fb"))
-	return FALSE;
+    if (!xf86LoadSubModule(pScrn, "fb")) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Failed to load fb module.\n");
+	goto out_modes;
+    }
 
-#ifdef DRI2
-    if (!xf86LoadSubModule(pScrn, "dri2"))
-	return FALSE;
-#else
-    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-	       "Driver compiled without dri2 support."
-#endif
+    if (!xf86LoadSubModule(pScrn, "dri2")) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Failed to load dri2 module.\n");
+	goto out_modes;
+    }
 
     return TRUE;
+
+  out_modes:
+    free(ms->Options);
+  out_depth:
+  out_drm_version:
+    close(ms->fd);
+  out_err_bus:
+    drv_free_rec(pScrn);
+    return FALSE;
+
 }
 
 static Bool
@@ -908,7 +925,6 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	FatalError("Failed to initialize SAA.\n");
     }
 
-#ifdef DRI2
     ms->dri2_available = FALSE;
     if (ms->enable_dri) {
 	if (ms->xat) {
@@ -923,7 +939,6 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	    ms->from_dri = X_PROBED;
 	}
     }
-#endif
 
     xf86DrvMsg(pScrn->scrnIndex, ms->from_render, "Render acceleration is %s.\n",
 	       (ms->xat != NULL) ? "enabled" : "disabled");
@@ -1061,10 +1076,8 @@ drv_close_screen(int scrnIndex, ScreenPtr pScreen)
        ms->cursor = NULL;
     }
 
-#ifdef DRI2
     if (ms->dri2_available)
 	xorg_dri2_close(pScreen);
-#endif
 
     if (pScrn->vtSema)
 	pScrn->LeaveVT(scrnIndex, 0);

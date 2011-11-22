@@ -43,7 +43,6 @@
 #include "vmwgfx_saa.h"
 #include "wsbm_util.h"
 
-#ifdef DRI2
 typedef struct {
     int refcount;
     PixmapPtr pPixmap;
@@ -393,6 +392,5 @@ xorg_dri2_close(ScreenPtr pScreen)
 {
     DRI2CloseScreen(pScreen);
 }
-#endif
 
 /* vim: set sw=4 ts=8 sts=4: */

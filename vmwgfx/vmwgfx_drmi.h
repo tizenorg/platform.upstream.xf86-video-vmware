@@ -82,4 +82,6 @@ vmwgfx_max_fb_size(int drm_fd, size_t *size);
 int
 vmwgfx_update_gui_layout(int drm_fd, unsigned int num_rects,
 			 struct drm_vmw_rect *rects);
+int
+vmwgfx_get_param(int drm_fd, uint32_t param, uint64_t *out);
 #endif

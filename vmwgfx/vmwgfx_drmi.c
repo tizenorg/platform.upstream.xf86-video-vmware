@@ -386,7 +386,7 @@ vmwgfx_dma(unsigned int host_x, unsigned int host_y,
     return 0;
 }
 
-static int
+int
 vmwgfx_get_param(int drm_fd, uint32_t param, uint64_t *out)
 {
     struct drm_vmw_getparam_arg gp_arg;
