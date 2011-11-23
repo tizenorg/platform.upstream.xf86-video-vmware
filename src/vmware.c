@@ -344,13 +344,15 @@ VMWAREParseTopologyElement(ScrnInfoPtr pScrn,
 static xXineramaScreenInfo *
 VMWAREParseTopologyString(ScrnInfoPtr pScrn,
                           const char *topology,
-                          unsigned int *retNumOutputs)
+                          unsigned int *retNumOutputs,
+			  const char info[])
 {
    xXineramaScreenInfo *extents = NULL;
    unsigned int numOutputs = 0;
    const char *str = topology;
 
-   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Starting...\n");
+   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing %s topology: Starting...\n",
+	      info);
 
    do {
       unsigned int x, y, width, height;
@@ -391,11 +393,13 @@ VMWAREParseTopologyString(ScrnInfoPtr pScrn,
       extents[numOutputs - 1].height = height;
    } while (*str != 0);
 
-   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Succeeded.\n");
+   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing %s topology: Succeeded.\n",
+	      info);
    goto exit;
 
  error:
-   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Failed.\n");
+   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing %s topology: Failed.\n",
+	      info);
 
    free(extents);
    extents = NULL;
@@ -1435,11 +1439,25 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     }
 
 
-    if (useXinerama && xf86IsOptionSet(options, OPTION_STATIC_XINERAMA)) {
+    if (useXinerama && xf86IsOptionSet(options, OPTION_GUI_LAYOUT)) {
+       char *topology = xf86GetOptValString(options, OPTION_GUI_LAYOUT);
+       if (topology) {
+          pVMWARE->xineramaState =
+             VMWAREParseTopologyString(pScrn, topology,
+				       &pVMWARE->xineramaNumOutputs, "gui");
+
+         pVMWARE->xineramaStatic = pVMWARE->xineramaState != NULL;
+
+         free(topology);
+       }
+    } else if (useXinerama &&
+	       xf86IsOptionSet(options, OPTION_STATIC_XINERAMA)) {
        char *topology = xf86GetOptValString(options, OPTION_STATIC_XINERAMA);
        if (topology) {
           pVMWARE->xineramaState =
-             VMWAREParseTopologyString(pScrn, topology, &pVMWARE->xineramaNumOutputs);
+             VMWAREParseTopologyString(pScrn, topology,
+				       &pVMWARE->xineramaNumOutputs,
+				       "static Xinerama");
 
          pVMWARE->xineramaStatic = pVMWARE->xineramaState != NULL;
 
