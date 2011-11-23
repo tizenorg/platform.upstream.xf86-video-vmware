@@ -54,4 +54,6 @@ vmware_drv_la_SOURCES = \
 	vmwarevideo.c \
 	vmwaremodes.c \
 	vmware_bootstrap.h \
-	vmware_bootstrap.c
+	vmware_bootstrap.c \
+	vmware_common.c \
+	vmware_common.h
