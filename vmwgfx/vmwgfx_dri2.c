@@ -42,6 +42,7 @@
 #include "gc.h"
 #include "vmwgfx_saa.h"
 #include "wsbm_util.h"
+#include <unistd.h>
 
 typedef struct {
     int refcount;
@@ -363,6 +364,9 @@ xorg_dri2_init(ScreenPtr pScreen)
     modesettingPtr ms = modesettingPTR(pScrn);
     DRI2InfoRec dri2info;
     int major, minor;
+    char deviceName[80];
+    char fdPath[80];
+    ssize_t numChar;
 
     if (xf86LoaderCheckSymbol("DRI2Version")) {
 	DRI2Version(&major, &minor);
@@ -374,9 +378,24 @@ xorg_dri2_init(ScreenPtr pScreen)
 
     dri2info.version = min(DRI2INFOREC_VERSION, 3);
     dri2info.fd = ms->fd;
-
     dri2info.driverName = "vmwgfx";
-    dri2info.deviceName = "/dev/dri/card0"; /* FIXME */
+
+    /*
+     * This way of obtaining the DRM device name is a bit
+     * os-specific. It would be better to obtain it from
+     * drmOpen. Currently this works only for Linux.
+     */
+    snprintf(fdPath, 80, "/proc/self/fd/%d", ms->fd);
+    numChar = readlink(fdPath, deviceName, 80);
+    if (numChar <= 0 || numChar >= 80) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		   "Could not find the drm device name. Disabling dri2.\n");
+	return FALSE;
+    }
+    deviceName[numChar] = 0;
+    dri2info.deviceName = deviceName;
+    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+	       "Path of drm device is \"%s\".\n", deviceName);
 
     dri2info.CreateBuffer = dri2_create_buffer;
     dri2info.DestroyBuffer = dri2_destroy_buffer;
