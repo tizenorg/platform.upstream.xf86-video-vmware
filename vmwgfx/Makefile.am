@@ -2,6 +2,7 @@ noinst_LTLIBRARIES = libvmwgfx.la
 libvmwgfx_la_CFLAGS = $(CWARNFLAGS) $(XORG_CFLAGS) @LIBDRM_CFLAGS@ @XATRACKER_CFLAGS@ -I$(top_srcdir)/src -I$(top_srcdir)/saa
 libvmwgfx_la_LIBADD = @LIBDRM_LIBS@ $(top_srcdir)/saa/libsaa.la\
 	@XATRACKER_LIBS@
+libvmwgfx_la_DEPENDENCIES = $(top_srcdir)/saa/libsaa.la
 
 libvmwgfx_la_SOURCES = \
 	vmwgfx_driver.c \
