@@ -60,6 +60,7 @@
 #include <saa.h>
 #include "vmwgfx_saa.h"
 #include "../src/vmware_bootstrap.h"
+#include "../src/vmware_common.h"
 
 /*
  * We can't incude svga_types.h due to conflicting types for Bool.
@@ -280,6 +281,57 @@ drv_init_drm(ScrnInfoPtr pScrn)
     return TRUE;
 }
 
+/**
+ * vmwgfx_set_topology - Set the GUI topology according to an option string
+ *
+ * @pScrn: Pointer to a ScrnInfo struct.
+ * @topology: String containing the topology description.
+ * @info: Info describing the option used to invoke this function.
+ *
+ * This function reads a GUI topology according from @topology, and
+ * calls into the kernel to set that topology.
+ */
+static Bool
+vmwgfx_set_topology(ScrnInfoPtr pScrn, const char *topology, const char *info)
+{
+    modesettingPtr ms = modesettingPTR(pScrn);
+    unsigned int num_outputs;
+    xXineramaScreenInfo *screen_info;
+    struct drm_vmw_rect *rects;
+    int ret;
+    unsigned int i;
+
+    screen_info = VMWAREParseTopologyString(pScrn, topology, &num_outputs,
+					    info);
+
+    if (screen_info == NULL)
+	return FALSE;
+
+    rects = calloc(num_outputs, sizeof(*rects));
+    if (rects == NULL) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		   "Failed to allocate topology data.\n");
+	goto out_no_rects;
+    }
+
+    for(i = 0; i < num_outputs; ++i) {
+	rects[i].x = screen_info[i].x_org;
+	rects[i].y = screen_info[i].y_org;
+	rects[i].w = screen_info[i].width;
+	rects[i].h = screen_info[i].height;
+    }
+
+    ret = vmwgfx_update_gui_layout(ms->fd, num_outputs, rects);
+    free(rects);
+    free(screen_info);
+
+    return (ret == 0);
+
+  out_no_rects:
+    free(screen_info);
+    return FALSE;
+}
+
 static Bool
 drv_pre_init(ScrnInfoPtr pScrn, int flags)
 {
@@ -288,6 +340,7 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
     rgb defaultWeight = { 0, 0, 0 };
     EntityInfoPtr pEnt;
     uint64_t cap;
+    Bool ret = TRUE;
 
     if (pScrn->numEntities != 1)
 	return FALSE;
@@ -440,15 +493,38 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
 	ms->SWCursor = TRUE;
     }
 
+    if (xf86IsOptionSet(ms->Options, OPTION_GUI_LAYOUT)) {
+	char *topology =
+	    xf86GetOptValString(ms->Options, OPTION_GUI_LAYOUT);
+
+	ret = FALSE;
+	if (topology) {
+	    ret = vmwgfx_set_topology(pScrn, topology, "gui");
+	    free(topology);
+	}
+
+    } else if (xf86IsOptionSet(ms->Options, OPTION_STATIC_XINERAMA)) {
+	char *topology =
+	    xf86GetOptValString(ms->Options, OPTION_STATIC_XINERAMA);
+
+	ret = FALSE;
+	if (topology) {
+	    ret = vmwgfx_set_topology(pScrn, topology, "static Xinerama");
+	    free(topology);
+	}
+    }
+
+    if (!ret)
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Falied parsing or setting "
+		   "gui topology from config file.\n");
+
     xorg_crtc_init(pScrn);
     xorg_output_init(pScrn);
 
-    ms->initialization = TRUE;
     if (!xf86InitialConfiguration(pScrn, TRUE)) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No valid modes.\n");
 	goto out_modes;
     }
-    ms->initialization = FALSE;
 
     /*
      * If the driver can do gamma correction, it should call xf86SetGamma() here.
