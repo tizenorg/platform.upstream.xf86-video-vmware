@@ -55,6 +55,8 @@
 #define DRV_ERROR(msg)	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, msg);
 #define debug_printf(...)
 
+#define VMWGFX_DRI_DEVICE_LEN 80
+
 typedef struct
 {
     int lastInstance;
@@ -119,6 +121,7 @@ typedef struct _modesettingRec
     struct xa_tracker *xat;
 #ifdef DRI2
     Bool dri2_available;
+    char dri2_device_name[VMWGFX_DRI_DEVICE_LEN];
 #endif
 } modesettingRec, *modesettingPtr;
 

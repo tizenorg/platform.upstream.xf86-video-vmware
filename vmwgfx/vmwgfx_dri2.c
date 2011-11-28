@@ -44,6 +44,8 @@
 #include "wsbm_util.h"
 #include <unistd.h>
 
+#define VMWGFX_FD_PATH_LEN 80
+
 typedef struct {
     int refcount;
     PixmapPtr pPixmap;
@@ -364,8 +366,7 @@ xorg_dri2_init(ScreenPtr pScreen)
     modesettingPtr ms = modesettingPTR(pScrn);
     DRI2InfoRec dri2info;
     int major, minor;
-    char deviceName[80];
-    char fdPath[80];
+    char fdPath[VMWGFX_FD_PATH_LEN];
     ssize_t numChar;
 
     if (xf86LoaderCheckSymbol("DRI2Version")) {
@@ -385,17 +386,18 @@ xorg_dri2_init(ScreenPtr pScreen)
      * os-specific. It would be better to obtain it from
      * drmOpen. Currently this works only for Linux.
      */
-    snprintf(fdPath, 80, "/proc/self/fd/%d", ms->fd);
-    numChar = readlink(fdPath, deviceName, 80);
-    if (numChar <= 0 || numChar >= 80) {
+    memset(fdPath, 0, VMWGFX_FD_PATH_LEN);
+    snprintf(fdPath, VMWGFX_FD_PATH_LEN - 1, "/proc/self/fd/%d", ms->fd);
+    numChar = readlink(fdPath, ms->dri2_device_name, VMWGFX_DRI_DEVICE_LEN);
+    if (numChar <= 0 || numChar >= VMWGFX_DRI_DEVICE_LEN) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
 		   "Could not find the drm device name. Disabling dri2.\n");
 	return FALSE;
     }
-    deviceName[numChar] = 0;
-    dri2info.deviceName = deviceName;
+    ms->dri2_device_name[numChar] = 0;
+    dri2info.deviceName = ms->dri2_device_name;
     xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-	       "Path of drm device is \"%s\".\n", deviceName);
+	       "Path of drm device is \"%s\".\n", ms->dri2_device_name);
 
     dri2info.CreateBuffer = dri2_create_buffer;
     dri2info.DestroyBuffer = dri2_destroy_buffer;
