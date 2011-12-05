@@ -182,14 +182,16 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
 	    return FALSE;
 
 	srf = vpix->hw;
+	private->refcount++;
+	private->dri2_depth = depth;
 
 	/*
 	 * Compiz workaround. See vmwgfx_dirty();
 	 */
 
-	vpix->hw_is_dri2_fronts++;
-	private->refcount++;
-	private->dri2_depth = depth;
+	if (buffer->attachment == DRI2BufferFrontLeft ||
+	    buffer->attachment == DRI2BufferFakeFrontLeft)
+	    vpix->hw_is_dri2_fronts++;
     }
 
     private->srf = srf;
@@ -211,6 +213,7 @@ dri2_do_destroy_buffer(DrawablePtr pDraw, DRI2BufferPtr buffer)
     BufferPrivatePtr private = buffer->driverPrivate;
     struct xa_surface *srf = private->srf;
     ScreenPtr pScreen = pDraw->pScreen;
+    struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(private->pPixmap);
 
     if (--private->refcount == 0 && srf) {
 	xa_surface_destroy(srf);
@@ -220,11 +223,11 @@ dri2_do_destroy_buffer(DrawablePtr pDraw, DRI2BufferPtr buffer)
      * Compiz workaround. See vmwgfx_dirty();
      */
 
-    if (private->refcount == 1) {
-	struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(private->pPixmap);
-	if (--vpix->hw_is_dri2_fronts == 0)
-	    WSBMLISTDELINIT(&vpix->sync_x_head);
-    }
+    if ((buffer->attachment == DRI2BufferFrontLeft ||
+	 buffer->attachment == DRI2BufferFakeFrontLeft) &&
+	private->refcount == 1 &&
+	--vpix->hw_is_dri2_fronts == 0)
+	WSBMLISTDELINIT(&vpix->sync_x_head);
 
     private->srf = NULL;
     pScreen->DestroyPixmap(private->pPixmap);
