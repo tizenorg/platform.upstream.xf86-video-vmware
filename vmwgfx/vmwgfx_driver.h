@@ -89,17 +89,17 @@ typedef struct _modesettingRec
 
     /* Accel */
     Bool accelerate_render;
-    Bool from_render;
+    MessageType from_render;
     Bool rendercheck;
     MessageType from_rendercheck;
     Bool SWCursor;
     CursorPtr cursor;
     Bool enable_dri;
-    Bool from_dri;
+    MessageType from_dri;
     Bool direct_presents;
-    Bool from_dp;
+    MessageType from_dp;
     Bool only_hw_presents;
-    Bool from_hwp;
+    MessageType from_hwp;
     Bool isMaster;
 
 
