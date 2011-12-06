@@ -191,6 +191,7 @@ static const OptionInfoRec VMWAREOptions[] = {
     { OPTION_DRI, "DRI", OPTV_BOOLEAN, {0}, FALSE},
     { OPTION_DIRECT_PRESENTS, "DirectPresents", OPTV_BOOLEAN, {0}, FALSE},
     { OPTION_HW_PRESENTS, "HWPresents", OPTV_BOOLEAN, {0}, FALSE},
+    { OPTION_RENDERCHECK, "RenderCheck", OPTV_BOOLEAN, {0}, FALSE},
     { -1,               NULL,           OPTV_NONE,      {0},    FALSE }
 };
 

@@ -1070,7 +1070,12 @@ vmwgfx_composite_prepare(struct saa_driver *driver, CARD8 op,
 	valid_hw = (valid_hw && tmp_valid_hw);
     }
 
-    if (!valid_hw && !dirty_hw)
+    /*
+     * In rendercheck mode we try to accelerate all supported
+     * composite operations.
+     */
+
+    if (!valid_hw && !dirty_hw && !vsaa->rendercheck)
 	goto out_err;
 
     /*
@@ -1320,7 +1325,8 @@ Bool
 vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
 		void (*present_flush)(ScreenPtr pScreen),
 		Bool direct_presents,
-		Bool only_hw_presents)
+		Bool only_hw_presents,
+		Bool rendercheck)
 {
     struct vmwgfx_saa *vsaa;
 
@@ -1342,6 +1348,7 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
     vsaa->can_optimize_dma = FALSE;
     vsaa->use_present_opt = direct_presents;
     vsaa->only_hw_presents = only_hw_presents;
+    vsaa->rendercheck = rendercheck;
     WSBMINITLISTHEAD(&vsaa->sync_x_list);
 
     vsaa->driver = vmwgfx_saa_driver;

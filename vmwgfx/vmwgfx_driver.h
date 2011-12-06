@@ -90,6 +90,8 @@ typedef struct _modesettingRec
     /* Accel */
     Bool accelerate_render;
     Bool from_render;
+    Bool rendercheck;
+    MessageType from_rendercheck;
     Bool SWCursor;
     CursorPtr cursor;
     Bool enable_dri;

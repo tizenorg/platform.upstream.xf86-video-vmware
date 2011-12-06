@@ -82,7 +82,8 @@ extern Bool
 vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
 		void (*present_flush)(ScreenPtr pScreen),
 		Bool direct_presents,
-		Bool only_hw_presents);
+		Bool only_hw_presents,
+		Bool rendercheck);
 
 extern uint32_t
 vmwgfx_scanout_ref(struct vmwgfx_screen_entry *box);

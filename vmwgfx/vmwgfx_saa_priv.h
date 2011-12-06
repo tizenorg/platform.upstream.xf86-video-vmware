@@ -53,6 +53,7 @@ struct vmwgfx_saa {
     Bool can_optimize_dma;
     Bool use_present_opt;
     Bool only_hw_presents;
+    Bool rendercheck;
     void (*present_flush) (ScreenPtr pScreen);
     struct _WsbmListHead sync_x_list;
     struct vmwgfx_composite *vcomp;

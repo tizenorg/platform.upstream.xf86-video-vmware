@@ -449,6 +449,11 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
 					&ms->accelerate_render) ?
 	X_CONFIG : X_PROBED;
 
+    ms->rendercheck = FALSE;
+    ms->from_rendercheck = xf86GetOptValBool(ms->Options, OPTION_RENDERCHECK,
+					     &ms->rendercheck) ?
+	X_CONFIG : X_DEFAULT;
+
     ms->enable_dri = ms->accelerate_render;
     ms->from_dri = xf86GetOptValBool(ms->Options, OPTION_DRI,
 				     &ms->enable_dri) ?
@@ -993,11 +998,18 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 		ms->from_render = X_PROBED;
 	    }
 	}
+	if (ms->xat == NULL && ms->rendercheck) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		       "Turning off renercheck mode.\n");
+	    ms->rendercheck = FALSE;
+	    ms->from_rendercheck = X_PROBED;
+	}
     }
 
     if (!vmwgfx_saa_init(pScreen, ms->fd, ms->xat, &xorg_flush,
 			 ms->direct_presents,
-			 ms->only_hw_presents)) {
+			 ms->only_hw_presents,
+			 ms->rendercheck)) {
 	FatalError("Failed to initialize SAA.\n");
     }
 
@@ -1018,6 +1030,11 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
     xf86DrvMsg(pScrn->scrnIndex, ms->from_render, "Render acceleration is %s.\n",
 	       (ms->xat != NULL) ? "enabled" : "disabled");
+
+    xf86DrvMsg(pScrn->scrnIndex, ms->from_rendercheck,
+	       "Rendercheck mode is %s.\n",
+	       (ms->rendercheck) ? "enabled" : "disabled");
+
     xf86DrvMsg(pScrn->scrnIndex, ms->from_dri, "Direct rendering (3D) is %s.\n",
 	       (ms->dri2_available) ? "enabled" : "disabled");
     if (ms->xat != NULL) {
