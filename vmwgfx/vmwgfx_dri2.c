@@ -157,10 +157,16 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
     case DRI2BufferDepth:
 	depth = (format) ? vmwgfx_z_format_to_depth(format) :
 	    pDraw->bitsPerPixel;
-	srf = xa_surface_create(ms->xat, pDraw->width, pDraw->height,
-				depth,
-				xa_type_z, xa_format_unknown,
-				XA_FLAG_SHARED);
+
+	if (depth == 24)
+	    srf = xa_surface_create(ms->xat, pDraw->width, pDraw->height,
+				    depth, xa_type_zs, xa_format_unknown,
+				    XA_FLAG_SHARED );
+	else
+	    srf = xa_surface_create(ms->xat, pDraw->width, pDraw->height,
+				    depth,
+				    xa_type_z, xa_format_unknown,
+				    XA_FLAG_SHARED);
 	if (!srf)
 	    return FALSE;
 

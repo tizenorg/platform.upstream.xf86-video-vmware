@@ -225,8 +225,9 @@ vmwgfx_choose_accel_format(unsigned int depth)
 {
     switch(depth) {
     case 32:
-    case 24:
 	return xa_format_a8r8g8b8;
+    case 24:
+	return xa_format_x8r8g8b8;
     case 16:
 	return xa_format_r5g6b5;
     case 15:
