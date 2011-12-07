@@ -78,7 +78,7 @@ typedef int8_t int8;
 typedef uint8_t uint8;
 #include "./src/svga_reg.h"
 
-#define XA_VERSION_MINOR_REQUIRED 0
+#define XA_VERSION_MINOR_REQUIRED 6
 #define DRM_VERSION_MAJOR_REQUIRED 2
 #define DRM_VERSION_MINOR_REQUIRED 3
 
@@ -984,8 +984,9 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 		    ms->xat = NULL;
 		    ms->from_render = X_PROBED;
 		}
-	    } else if (major != XA_TRACKER_VERSION_MAJOR ||
-		       minor < XA_VERSION_MINOR_REQUIRED) {
+	    }
+	    if (major != XA_TRACKER_VERSION_MAJOR ||
+		minor < XA_VERSION_MINOR_REQUIRED) {
 		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
 			   "Expecting %d.%d.x >= XA version < %d.0.0.\n",
 			   XA_TRACKER_VERSION_MAJOR,

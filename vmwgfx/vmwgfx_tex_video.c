@@ -45,35 +45,27 @@
 #define RES_720P_Y 720
 
 
-/* The ITU-R BT.601 conversion matrix for SDTV. */
-/* original, matrix, but we transpose it to
- * make the shader easier
-static const float bt_601[] = {
-    1.0, 0.0, 1.4075,   ,
-    1.0, -0.3455, -0.7169, 0,
-    1.0, 1.7790, 0., 0,
-};*/
-static const float bt_601[] = {
-    1.0, 1.0, 1.0,        0.5,
-    0.0, -0.3455, 1.7790, 0,
-    1.4075, -0.7169, 0.,  0,
-};
-
-/* The ITU-R BT.709 conversion matrix for HDTV. */
-/* original, but we transpose to make the conversion
- * in the shader easier
-static const float bt_709[] = {
-    1.0, 0.0, 1.581, 0,
-    1.0, -0.1881, -0.47, 0,
-    1.0, 1.8629, 0., 0,
-};*/
-static const float bt_709[] = {
-    1.0,   1.0,     1.0,     0.5,
-    0.0,  -0.1881,  1.8629,  0,
-    1.581,-0.47   , 0.0,     0,
-};
-
 #define MAKE_ATOM(a) MakeAtom(a, sizeof(a) - 1, TRUE)
+
+/*
+ * ITU-R BT.601, BT.709 transfer matrices.
+ * [R', G', B'] values are in the range [0, 1], Y' is in the range [0,1]
+ * and [Pb, Pr] components are in the range [-0.5, 0.5].
+ *
+ * The matrices are transposed to fit the xa conversion matrix format.
+ */
+
+static const float bt_601[] = {
+    1.f, 1.f, 1.f, 0.f,
+    0.f, -0.344136f, 1.772f, 0.f,
+    1.402f,  -0.714136f, 0.f, 0.f
+};
+
+static const float bt_709[] = {
+    1.f, 1.f, 1.f, 0.f,
+    0.f, -0.187324f, 1.8556f, 0.f,
+    1.5748f, -0.468124f, 0.f, 0.f
+};
 
 static Atom xvBrightness, xvContrast;
 
@@ -119,7 +111,55 @@ struct xorg_xv_port_priv {
     struct xa_surface *yuv[3];
 
     int drm_fd;
+
+    Bool hdtv;
+    float uv_offset;
+    float uv_scale;
+    float y_offset;
+    float y_scale;
+    float rgb_offset;
+    float rgb_scale;
+    float cm[16];
 };
+
+/*
+ * vmwgfx_update_conversion_matrix - Compute the effective color conversion
+ * matrix.
+ *
+ * Applies yuv- and resulting rgb scales and offsets to compute the correct
+ * color conversion matrix. These scales and offsets are properties of the
+ * video stream (and might in the future be adjusted using XV properties as well).
+ */
+static void
+vmwgfx_update_conversion_matrix(struct xorg_xv_port_priv *priv)
+{
+    int i;
+    float *cm = priv->cm;
+
+    memcpy(cm, ((priv->hdtv) ? bt_709 : bt_601), sizeof(bt_601));
+
+    /*
+     * Adjust for yuv scales in input and rgb scale in the converted output.
+     */
+
+    for(i = 0; i < 3; ++i) {
+	cm[i] *= (priv->y_scale*priv->rgb_scale);
+	cm[i+4] *= (priv->uv_scale*priv->rgb_scale);
+	cm[i+8] *= (priv->uv_scale*priv->rgb_scale);
+    }
+
+    /*
+     * Adjust for yuv offsets in input and rgb offset in the converted output.
+     */
+    for (i = 0; i < 3; ++i)
+	cm[i+12] = -cm[i]*priv->y_offset - (cm[i+4] + cm[i+8])*priv->uv_offset
+	    - priv->rgb_offset*priv->rgb_scale;
+
+    /*
+     * Alpha is 1, unconditionally.
+     */
+    cm[15] = 1.f;
+}
 
 
 static void
@@ -451,7 +491,6 @@ display_video(ScreenPtr pScreen, struct xorg_xv_port_priv *pPriv, int id,
     RegionRec reg;
     int ret = BadAlloc;
     int blit_ret;
-    const float *conv_matrix;
 
     REGION_NULL(pScreen, &reg);
 
@@ -459,7 +498,10 @@ display_video(ScreenPtr pScreen, struct xorg_xv_port_priv *pPriv, int id,
 	goto out_no_dst;
 
    hdtv = ((src_w >= RES_720P_X) && (src_h >= RES_720P_Y));
-   conv_matrix = (hdtv ? bt_709 : bt_601);
+   if (hdtv != pPriv->hdtv) {
+       pPriv->hdtv = hdtv;
+       vmwgfx_update_conversion_matrix(pPriv);
+   }
 
 #ifdef COMPOSITE
 
@@ -489,7 +531,7 @@ display_video(ScreenPtr pScreen, struct xorg_xv_port_priv *pPriv, int id,
 				 dst_x, dst_y, dst_w, dst_h,
 				 (struct xa_box *)REGION_RECTS(dstRegion),
 				 REGION_NUM_RECTS(dstRegion),
-				 conv_matrix,
+				 pPriv->cm,
 				 vpix->hw, pPriv->yuv);
 
    saa_pixmap_dirty(pPixmap, TRUE, dstRegion);
@@ -579,6 +621,15 @@ port_priv_create(struct xa_tracker *xat, struct xa_context *r,
    priv->xat = xat;
    priv->drm_fd = drm_fd;
    REGION_NULL(pScreen, &priv->clip);
+   priv->hdtv = FALSE;
+   priv->uv_offset = 0.5f;
+   priv->uv_scale = 1.f;
+   priv->y_offset = 0.f;
+   priv->y_scale = 1.f;
+   priv->rgb_offset = 0.f;
+   priv->rgb_scale = 1.f;
+
+   vmwgfx_update_conversion_matrix(priv);
 
    return priv;
 }
