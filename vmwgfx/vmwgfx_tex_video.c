@@ -35,7 +35,7 @@
 #include <fourcc.h>
 #include <xa_tracker.h>
 #include <xa_context.h>
-
+#include <math.h>
 
 /*XXX get these from pipe's texture limits */
 #define IMAGE_MAX_WIDTH		2048
@@ -67,12 +67,14 @@ static const float bt_709[] = {
     1.5748f, -0.468124f, 0.f, 0.f
 };
 
-static Atom xvBrightness, xvContrast;
+static Atom xvBrightness, xvContrast, xvSaturation, xvHue;
 
-#define NUM_TEXTURED_ATTRIBUTES 2
+#define NUM_TEXTURED_ATTRIBUTES 4
 static XF86AttributeRec TexturedAttributes[NUM_TEXTURED_ATTRIBUTES] = {
-   {XvSettable | XvGettable, -128, 127, "XV_BRIGHTNESS"},
-   {XvSettable | XvGettable, 0, 255, "XV_CONTRAST"}
+   {XvSettable | XvGettable, -1000, 1000, "XV_BRIGHTNESS"},
+   {XvSettable | XvGettable, -1000, 1000, "XV_CONTRAST"},
+   {XvSettable | XvGettable, -1000, 1000, "XV_SATURATION"},
+   {XvSettable | XvGettable, -1000, 1000, "XV_HUE"}
 };
 
 #define NUM_FORMATS 3
@@ -105,6 +107,8 @@ struct xorg_xv_port_priv {
 
     int brightness;
     int contrast;
+    int saturation;
+    int hue;
 
     int current_set;
     struct vmwgfx_dmabuf *bounce[2][3];
@@ -119,6 +123,8 @@ struct xorg_xv_port_priv {
     float y_scale;
     float rgb_offset;
     float rgb_scale;
+    float sinhue;
+    float coshue;
     float cm[16];
 };
 
@@ -128,20 +134,32 @@ struct xorg_xv_port_priv {
  *
  * Applies yuv- and resulting rgb scales and offsets to compute the correct
  * color conversion matrix. These scales and offsets are properties of the
- * video stream (and might in the future be adjusted using XV properties as well).
+ * video stream and can be adjusted using XV properties as well.
  */
 static void
 vmwgfx_update_conversion_matrix(struct xorg_xv_port_priv *priv)
 {
     int i;
     float *cm = priv->cm;
+    static const float *bt;
 
-    memcpy(cm, ((priv->hdtv) ? bt_709 : bt_601), sizeof(bt_601));
+    bt = (priv->hdtv) ? bt_709 : bt_601;
+
+    memcpy(cm, bt, sizeof(bt_601));
+
+    /*
+     * Apply hue rotation
+     */
+    cm[4] = priv->coshue * bt[4] - priv->sinhue * bt[8];
+    cm[8] = priv->sinhue * bt[4] + priv->coshue * bt[8];
+    cm[5] = priv->coshue * bt[5] - priv->sinhue * bt[9];
+    cm[9] = priv->sinhue * bt[5] + priv->coshue * bt[9];
+    cm[6] = priv->coshue * bt[6] - priv->sinhue * bt[10];
+    cm[10] = priv->sinhue * bt[6] + priv->coshue * bt[10];
 
     /*
      * Adjust for yuv scales in input and rgb scale in the converted output.
      */
-
     for(i = 0; i < 3; ++i) {
 	cm[i] *= (priv->y_scale*priv->rgb_scale);
 	cm[i+4] *= (priv->uv_scale*priv->rgb_scale);
@@ -201,16 +219,41 @@ set_port_attribute(ScrnInfoPtr pScrn,
    struct xorg_xv_port_priv *priv = (struct xorg_xv_port_priv *)data;
 
    if (attribute == xvBrightness) {
-      if ((value < -128) || (value > 127))
-         return BadValue;
-      priv->brightness = value;
+       if ((value < -1000) || (value > 1000))
+	   return BadValue;
+
+       priv->brightness = value;
+       priv->y_offset = -((float) value)/1000.f;
+
    } else if (attribute == xvContrast) {
-      if ((value < 0) || (value > 255))
-         return BadValue;
-      priv->contrast = value;
+       if ((value < -1000) || (value > 1000))
+	   return BadValue;
+
+       priv->contrast = value;
+       priv->rgb_scale = ((float) value + 1000.f)/1000.f;
+
+   } else if (attribute == xvSaturation) {
+       if ((value < -1000) || (value > 1000))
+	   return BadValue;
+
+       priv->saturation = value;
+       priv->uv_scale = ((float) value + 1000.f)/1000.f;
+
+   } else if (attribute == xvHue) {
+       double hue_angle;
+
+       if ((value < -1000) || (value > 1000))
+	   return BadValue;
+
+       priv->hue = value;
+       hue_angle = (double) value * M_PI / 1000.;
+       priv->sinhue = sin(hue_angle);
+       priv->coshue = cos(hue_angle);
+
    } else
       return BadMatch;
 
+   vmwgfx_update_conversion_matrix(priv);
    return Success;
 }
 
@@ -218,16 +261,20 @@ static int
 get_port_attribute(ScrnInfoPtr pScrn,
                    Atom attribute, INT32 * value, pointer data)
 {
-   struct xorg_xv_port_priv *priv = (struct xorg_xv_port_priv *)data;
+    struct xorg_xv_port_priv *priv = (struct xorg_xv_port_priv *)data;
 
-   if (attribute == xvBrightness)
-      *value = priv->brightness;
-  else if (attribute == xvContrast)
-      *value = priv->contrast;
-   else
-      return BadMatch;
+    if (attribute == xvBrightness)
+	*value = priv->brightness;
+    else if (attribute == xvContrast)
+	*value = priv->contrast;
+    else if (attribute == xvSaturation)
+	*value = priv->saturation;
+    else if (attribute == xvHue)
+	*value = priv->hue;
+    else
+	return BadMatch;
 
-   return Success;
+    return Success;
 }
 
 static void
@@ -628,6 +675,8 @@ port_priv_create(struct xa_tracker *xat, struct xa_context *r,
    priv->y_scale = 1.f;
    priv->rgb_offset = 0.f;
    priv->rgb_scale = 1.f;
+   priv->sinhue = 0.f;
+   priv->coshue = 1.f;
 
    vmwgfx_update_conversion_matrix(priv);
 
@@ -739,6 +788,8 @@ xorg_xv_init(ScreenPtr pScreen)
     */
    xvBrightness = MAKE_ATOM("XV_BRIGHTNESS");
    xvContrast = MAKE_ATOM("XV_CONTRAST");
+   xvSaturation = MAKE_ATOM("XV_SATURATION");
+   xvHue = MAKE_ATOM("XV_HUE");
 
    if (ms->xat) {
        textured_adapter = xorg_setup_textured_adapter(pScreen);
