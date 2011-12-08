@@ -294,7 +294,8 @@ query_best_size(ScrnInfoPtr pScrn,
 }
 
 static int
-check_yuv_surfaces(struct xorg_xv_port_priv *priv,  int width, int height)
+check_yuv_surfaces(struct xorg_xv_port_priv *priv,  int id,
+		   int width, int height)
 {
     struct xa_surface **yuv = priv->yuv;
     struct vmwgfx_dmabuf **bounce = priv->bounce[priv->current_set];
@@ -303,6 +304,25 @@ check_yuv_surfaces(struct xorg_xv_port_priv *priv,  int width, int height)
     size_t size;
 
     for (i=0; i<3; ++i) {
+
+	/*
+	 * Adjust u,v texture size and DMA buffer to what's required by
+	 * the format.
+	 */
+	if (i == 1) {
+	    switch(id) {
+	    case FOURCC_YV12:
+		height /= 2;
+		/* Fall through */
+	    case FOURCC_YUY2:
+	    case FOURCC_UYVY:
+		width /= 2;
+		break;
+	    default:
+		break;
+	    }
+	}
+
 	if (!yuv[i])
 	    yuv[i] = xa_surface_create(priv->xat, width, height, 8,
 				       xa_type_yuv_component,
@@ -392,7 +412,7 @@ copy_packed_data(ScrnInfoPtr pScrn,
                  int top,
                  unsigned short w, unsigned short h)
 {
-   int i, j;
+    int i;
    struct vmwgfx_dmabuf **bounce = port->bounce[port->current_set];
    char *ymap, *vmap, *umap;
    unsigned char y1, y2, u, v;
@@ -431,18 +451,11 @@ copy_packed_data(ScrnInfoPtr pScrn,
       y = buf + offsets[0];
       v = buf + offsets[1];
       u = buf + offsets[2];
-      for (i = 0; i < h; ++i) {
-         for (j = 0; j < w; ++j) {
-            int yoffset = (w*i+j);
-            int ii = (i|1), jj = (j|1);
-            int vuoffset = (w/2)*(ii/2) + (jj/2);
-            ymap[yidx++] = y[yoffset];
-            umap[uidx++] = u[vuoffset];
-            vmap[vidx++] = v[vuoffset];
-         }
-      }
-   }
+      memcpy(ymap, y, w*h);
+      memcpy(vmap, v, w*h/4);
+      memcpy(umap, u, w*h/4);
       break;
+   }
    case FOURCC_UYVY:
       for (i = 0; i < y_array_size; i +=2 ) {
          /* extracting two pixels */
@@ -455,8 +468,6 @@ copy_packed_data(ScrnInfoPtr pScrn,
          ymap[yidx++] = y1;
          ymap[yidx++] = y2;
          umap[uidx++] = u;
-         umap[uidx++] = u;
-         vmap[vidx++] = v;
          vmap[vidx++] = v;
       }
       break;
@@ -473,8 +484,6 @@ copy_packed_data(ScrnInfoPtr pScrn,
          ymap[yidx++] = y1;
          ymap[yidx++] = y2;
          umap[uidx++] = u;
-         umap[uidx++] = u;
-         vmap[vidx++] = v;
          vmap[vidx++] = v;
       }
       break;
@@ -508,6 +517,27 @@ copy_packed_data(ScrnInfoPtr pScrn,
        for (i=0; i<3; ++i) {
 	   srf = port->yuv[i];
 	   buf = bounce[i];
+
+	   if (i == 1) {
+	       switch(id) {
+	       case FOURCC_YV12:
+		   h /= 2;
+		   /* Fall through */
+	       case FOURCC_YUY2:
+	       case FOURCC_UYVY:
+		   w /= 2;
+		   break;
+	       default:
+		   break;
+	       }
+
+	       box.x1 = 0;
+	       box.x2 = w;
+	       box.y1 = 0;
+	       box.y2 = h;
+
+	       REGION_RESET(pScrn->pScreen, &reg, &box);
+	   }
 
 	   if (xa_surface_handle(srf, &handle, &stride) != 0) {
 	       ret = BadAlloc;
@@ -629,7 +659,7 @@ put_image(ScrnInfoPtr pScrn,
 			      width, height))
       return Success;
 
-   ret = check_yuv_surfaces(pPriv, width, height);
+   ret = check_yuv_surfaces(pPriv, id, width, height);
    if (ret)
        return ret;
 
