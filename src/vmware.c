@@ -91,6 +91,9 @@ typedef struct {
    int height;
 } VMWAREDefaultMode;
 
+#define VMW_MIN_INITIAL_WIDTH 800
+#define VMW_MIN_INITIAL_HEIGHT 600
+
 #define SVGA_DEFAULT_MODE(width, height) { width, height, },
 
 static const VMWAREDefaultMode VMWAREDefaultModes[] = {
@@ -604,8 +607,14 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
     if (xf86GetOptValBool(options, OPTION_DEFAULT_MODE, &defaultMode)) {
         from = X_CONFIG;
     }
-    width = vmwareReadReg(pVMWARE, SVGA_REG_WIDTH);
-    height = vmwareReadReg(pVMWARE, SVGA_REG_HEIGHT);
+
+    width = vmwareReadReg(pVMWARE, SVGA_REG_MAX_WIDTH);
+    height = vmwareReadReg(pVMWARE, SVGA_REG_MAX_HEIGHT);
+    width = MAX(width, VMW_MIN_INITIAL_WIDTH);
+    height = MAX(height, VMW_MIN_INITIAL_HEIGHT);
+    width = MIN(width, pVMWARE->maxWidth);
+    height = MIN(height, pVMWARE->maxHeight);
+
     xf86DrvMsg(pScrn->scrnIndex, from,
 	       "Will %sset up a driver mode with dimensions %dx%d.\n",
 	       defaultMode ? "" : "not ", width, height);
