@@ -311,34 +311,28 @@ saa_copy_composite(CARD8 op,
 	ySrc + height > pSrc->pDrawable->height)
 	return FALSE;
 
-    if (saa_pixmap(saa_get_drawable_pixmap(pSrc->pDrawable))->auth_loc !=
-	saa_loc_driver)
-	return FALSE;
+    if (op == PictOpSrc ||
+	(op == PictOpOver && PICT_FORMAT_A(pSrc->format) == 0 &&
+	 pMask == NULL)) {
 
-    if ((op == PictOpSrc &&
-	 (pSrc->format == pDst->format ||
-	  (PICT_FORMAT_COLOR(pDst->format) &&
-	   PICT_FORMAT_COLOR(pSrc->format) &&
-	   pDst->format == PICT_FORMAT(PICT_FORMAT_BPP(pSrc->format),
-				       PICT_FORMAT_TYPE(pSrc->format),
-				       0,
-				       PICT_FORMAT_R(pSrc->format),
-				       PICT_FORMAT_G(pSrc->format),
-				       PICT_FORMAT_B(pSrc->format))))) ||
-	(op == PictOpOver && pSrc->format == pDst->format &&
-	 !PICT_FORMAT_A(pSrc->format))) {
-	Bool ret;
 	int xoff, yoff;
-	PixmapPtr pixmap = saa_get_pixmap(pDst->pDrawable, &xoff, &yoff);
+	PixmapPtr dst_pix = saa_get_pixmap(pDst->pDrawable, &xoff, &yoff);
+	struct saa_pixmap *dst_spix = saa_pixmap(dst_pix);
+	struct saa_pixmap *src_spix =
+	    saa_pixmap(saa_get_drawable_pixmap(pSrc->pDrawable));
+	int ret;
 
-	if (saa_pixmap(pixmap)->auth_loc != saa_loc_driver)
+	if (src_spix->auth_loc != saa_loc_driver ||
+	    dst_spix->auth_loc != saa_loc_driver)
 	    return FALSE;
+
+	src_spix->src_format = pSrc->format;
+	dst_spix->dst_format = pDst->format;
 
 	xDst += pDst->pDrawable->x;
 	yDst += pDst->pDrawable->y;
 	xSrc += pSrc->pDrawable->x;
 	ySrc += pSrc->pDrawable->y;
-
 
 	/*
 	 * Dst region is in backing pixmap space. We need to
@@ -350,6 +344,10 @@ saa_copy_composite(CARD8 op,
 			       REGION_NUM_RECTS(dst_region),
 			       xSrc - xDst, ySrc - yDst, FALSE, FALSE);
 	REGION_TRANSLATE(pScreen, dst_region, xoff, yoff);
+
+	src_spix->src_format = 0;
+	dst_spix->dst_format = 0;
+
 	if (ret)
 	    return TRUE;
     }
