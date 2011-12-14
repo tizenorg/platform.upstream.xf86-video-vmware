@@ -389,7 +389,13 @@ saa_check_poly_fill_rect(DrawablePtr pDrawable, GCPtr pGC,
     SAA_FALLBACK(("to %p (%c)\n", pDrawable, saa_drawable_loc(pDrawable)));
 
     sscreen->fallback_count++;
-    if (!saa_pad_write(pDrawable, pGC, TRUE, &access))
+
+    /*
+     * TODO: Use @prect for readback / damaging instead of
+     * the damage region. This may fragment the dirty regions more
+     * but should avoid unnecessary readbacks.
+     */
+    if (!saa_pad_write(pDrawable, pGC, FALSE, &access))
 	goto out_no_access;;
     if (!saa_prepare_access_gc(pGC))
 	goto out_no_gc;
