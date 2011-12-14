@@ -61,6 +61,11 @@ saa_hw_copy_nton(DrawablePtr pSrcDrawable,
     src_spix = saa_pixmap(pSrcPixmap);
     dst_spix = saa_pixmap(pDstPixmap);
 
+    if (src_spix->auth_loc != saa_loc_driver ||
+	dst_spix->auth_loc != saa_loc_driver)
+	return FALSE;
+
+
     ordering = (nbox == 1 || (dx > 0 && dy > 0) ||
 		(pDstDrawable != pSrcDrawable &&
 		 (pDstDrawable->type != DRAWABLE_WINDOW ||

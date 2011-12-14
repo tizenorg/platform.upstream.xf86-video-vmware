@@ -235,11 +235,18 @@ saa_driver_composite(CARD8		op,
 	return FALSE;
 
     dst_pix = saa_get_pixmap(pDst->pDrawable, &dst_off_x, &dst_off_y);
+    if (saa_pixmap(dst_pix)->auth_loc != saa_loc_driver)
+	return FALSE;
+
     if (pMask && pMask->pDrawable) {
 	mask_pix = saa_get_pixmap(pMask->pDrawable, &mask_off_x, &mask_off_y);
+	if (saa_pixmap(mask_pix)->auth_loc != saa_loc_driver)
+	    return FALSE;
     }
     if (pSrc->pDrawable) {
 	src_pix = saa_get_pixmap(pSrc->pDrawable, &src_off_x, &src_off_y);
+	if (saa_pixmap(src_pix)->auth_loc != saa_loc_driver)
+	    return FALSE;
     }
 
     if (!driver->composite_prepare(driver, op, pSrc, pMask, pDst,
@@ -304,6 +311,10 @@ saa_copy_composite(CARD8 op,
 	ySrc + height > pSrc->pDrawable->height)
 	return FALSE;
 
+    if (saa_pixmap(saa_get_drawable_pixmap(pSrc->pDrawable))->auth_loc !=
+	saa_loc_driver)
+	return FALSE;
+
     if ((op == PictOpSrc &&
 	 (pSrc->format == pDst->format ||
 	  (PICT_FORMAT_COLOR(pDst->format) &&
@@ -318,8 +329,10 @@ saa_copy_composite(CARD8 op,
 	 !PICT_FORMAT_A(pSrc->format))) {
 	Bool ret;
 	int xoff, yoff;
+	PixmapPtr pixmap = saa_get_pixmap(pDst->pDrawable, &xoff, &yoff);
 
-	saa_get_pixmap(pDst->pDrawable, &xoff, &yoff);
+	if (saa_pixmap(pixmap)->auth_loc != saa_loc_driver)
+	    return FALSE;
 
 	xDst += pDst->pDrawable->x;
 	yDst += pDst->pDrawable->y;
