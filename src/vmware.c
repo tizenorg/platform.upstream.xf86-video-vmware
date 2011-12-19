@@ -39,195 +39,17 @@ char rcsId_vmware[] =
 #include "guest_os.h"
 #include "vm_device_version.h"
 #include "svga_modes.h"
+#include "vmware_bootstrap.h"
+#include "vmware_common.h"
 
 #ifndef HAVE_XORG_SERVER_1_5_0
 #include <xf86_ansic.h>
 #include <xf86_libc.h>
 #endif
 
-#ifdef HaveDriverFuncs
-#define VMWARE_DRIVER_FUNC HaveDriverFuncs
-#else
-#define VMWARE_DRIVER_FUNC 0
-#endif
-
-/*
- * So that the file compiles unmodified when dropped in to a < 6.9 source tree.
- */
-#ifndef _X_EXPORT
-#define _X_EXPORT
-#endif
-/*
- * So that the file compiles unmodified when dropped into an xfree source tree.
- */
-#ifndef XORG_VERSION_CURRENT
-#define XORG_VERSION_CURRENT XF86_VERSION_CURRENT
-#endif
-
-/*
- * Sanity check that xf86PciInfo.h has the correct values (which come from
- * the VMware source tree in vm_device_version.h.
- */
-#if PCI_CHIP_VMWARE0405 != PCI_DEVICE_ID_VMWARE_SVGA2
-#error "PCI_CHIP_VMWARE0405 is wrong, update it from vm_device_version.h"
-#endif
-#if PCI_CHIP_VMWARE0710 != PCI_DEVICE_ID_VMWARE_SVGA
-#error "PCI_CHIP_VMWARE0710 is wrong, update it from vm_device_version.h"
-#endif
-#if PCI_VENDOR_VMWARE != PCI_VENDOR_ID_VMWARE
-#error "PCI_VENDOR_VMWARE is wrong, update it from vm_device_version.h"
-#endif
-
-#define VMWARE_INCHTOMM 25.4
-
-/*
- * This is the only way I know to turn a #define of an integer constant into
- * a constant string.
- */
-#define VMW_INNERSTRINGIFY(s) #s
-#define VMW_STRING(str) VMW_INNERSTRINGIFY(str)
-
-#define VMWARE_NAME "vmwlegacy"
-#define VMWARE_DRIVER_NAME "vmwlegacy"
-#define VMWARE_DRIVER_VERSION \
-   (PACKAGE_VERSION_MAJOR * 65536 + PACKAGE_VERSION_MINOR * 256 + PACKAGE_VERSION_PATCHLEVEL)
-#define VMWARE_DRIVER_VERSION_STRING \
-    VMW_STRING(PACKAGE_VERSION_MAJOR) "." VMW_STRING(PACKAGE_VERSION_MINOR) \
-    "." VMW_STRING(PACKAGE_VERSION_PATCHLEVEL)
-
-static const char VMWAREBuildStr[] = "VMware Guest X Server "
-    VMWARE_DRIVER_VERSION_STRING " - build=$Name$\n";
-
-/*
- * Standard four digit version string expected by VMware Tools installer.
- * As the driver's version is only  {major, minor, patchlevel},
- * The fourth digit may describe the commit number relative to the
- * last version tag as output from `git describe`
- */
-
-#ifdef __GNUC__
-#ifdef VMW_SUBPATCH
-const char vmwlegacy_drv_modinfo[]
-__attribute__((section(".modinfo"),unused)) =
-  "version=" VMWARE_DRIVER_VERSION_STRING "." VMW_STRING(VMW_SUBPATCH);
-#else
-const char vmwlegacy_drv_modinfo[]
-__attribute__((section(".modinfo"),unused)) =
-  "version=" VMWARE_DRIVER_VERSION_STRING ".0";
-#endif /*VMW_SUBPATCH*/
-#endif
-
-static SymTabRec VMWAREChipsets[] = {
-    { PCI_CHIP_VMWARE0405, "vmware0405" },
-    { PCI_CHIP_VMWARE0710, "vmware0710" },
-    { -1,                  NULL }
-};
-
-#ifndef XSERVER_LIBPCIACCESS
-static resRange vmwareLegacyRes[] = {
-    { ResExcIoBlock, SVGA_LEGACY_BASE_PORT,
-      SVGA_LEGACY_BASE_PORT + SVGA_NUM_PORTS*sizeof(uint32)},
-    _VGA_EXCLUSIVE, _END
-};
-#else
-#define vmwareLegacyRes NULL
-#endif
-
-#if XSERVER_LIBPCIACCESS
-
-#define VMWARE_DEVICE_MATCH(d, i) \
-    {PCI_VENDOR_VMWARE, (d), PCI_MATCH_ANY, PCI_MATCH_ANY, 0, 0, (i) }
-
-static const struct pci_id_match VMwareDeviceMatch[] = {
-    VMWARE_DEVICE_MATCH (PCI_CHIP_VMWARE0405, 0 ),
-    VMWARE_DEVICE_MATCH (PCI_CHIP_VMWARE0710, 0 ),
-    { 0, 0, 0 },
-};
-#endif
-
-/*
- * Currently, even the PCI obedient 0405 chip still only obeys IOSE and
- * MEMSE for the SVGA resources.  Thus, RES_EXCLUSIVE_VGA is required.
- *
- * The 0710 chip also uses hardcoded IO ports that aren't disablable.
- */
-
-static PciChipsets VMWAREPciChipsets[] = {
-    { PCI_CHIP_VMWARE0405, PCI_CHIP_VMWARE0405, RES_EXCLUSIVE_VGA },
-    { PCI_CHIP_VMWARE0710, PCI_CHIP_VMWARE0710, vmwareLegacyRes },
-    { -1,		       -1,		    RES_UNDEFINED }
-};
-
-#if HAVE_XORG_SERVER_1_7_0
-
+#if (GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) >= 5)
 #define xf86LoaderReqSymLists(...) do {} while (0)
-#define LoaderRefSymLists(...) do {} while (0)
-
-#else
-
-static const char *vgahwSymbols[] = {
-    "vgaHWGetHWRec",
-    "vgaHWGetIOBase",
-    "vgaHWGetIndex",
-    "vgaHWInit",
-    "vgaHWProtect",
-    "vgaHWRestore",
-    "vgaHWSave",
-    "vgaHWSaveScreen",
-    "vgaHWUnlock",
-    NULL
-};
-
-static const char *fbSymbols[] = {
-    "fbCreateDefColormap",
-    "fbPictureInit",
-    "fbScreenInit",
-    NULL
-};
-
-static const char *ramdacSymbols[] = {
-    "xf86CreateCursorInfoRec",
-    "xf86DestroyCursorInfoRec",
-    "xf86InitCursor",
-    NULL
-};
-
-static const char *shadowfbSymbols[] = {
-    "ShadowFBInit2",
-    NULL
-};
-
-#endif /* HAVE_XORG_SERVER_1_7_0 */
-
-#ifdef XFree86LOADER
-static XF86ModuleVersionInfo vmwlegacyVersRec = {
-    VMWARE_DRIVER_NAME,
-    MODULEVENDORSTRING,
-    MODINFOSTRING1,
-    MODINFOSTRING2,
-    XORG_VERSION_CURRENT,
-    PACKAGE_VERSION_MAJOR, PACKAGE_VERSION_MINOR, PACKAGE_VERSION_PATCHLEVEL,
-    ABI_CLASS_VIDEODRV,
-    ABI_VIDEODRV_VERSION,
-    MOD_CLASS_VIDEODRV,
-    { 0, 0, 0, 0}
-};
-#endif	/* XFree86LOADER */
-
-typedef enum {
-    OPTION_HW_CURSOR,
-    OPTION_XINERAMA,
-    OPTION_STATIC_XINERAMA,
-    OPTION_DEFAULT_MODE,
-} VMWAREOpts;
-
-static const OptionInfoRec VMWAREOptions[] = {
-    { OPTION_HW_CURSOR, "HWcursor",     OPTV_BOOLEAN,   {0},    FALSE },
-    { OPTION_XINERAMA,  "Xinerama",     OPTV_BOOLEAN,   {0},    FALSE },
-    { OPTION_STATIC_XINERAMA, "StaticXinerama", OPTV_STRING, {0}, FALSE },
-    { OPTION_DEFAULT_MODE, "AddDefaultMode", OPTV_BOOLEAN,   {0},    FALSE },
-    { -1,               NULL,           OPTV_NONE,      {0},    FALSE }
-};
+#endif
 
 /* Table of default modes to always add to the mode list. */
 
@@ -465,141 +287,6 @@ RewriteTagString(const char *istr, char *ostr, int osize)
     } while (chr);
 }
 #endif
-
-static void
-VMWAREIdentify(int flags)
-{
-    xf86PrintChipsets(VMWARE_NAME, "driver for VMware SVGA", VMWAREChipsets);
-}
-
-static const OptionInfoRec *
-VMWAREAvailableOptions(int chipid, int busid)
-{
-    return VMWAREOptions;
-}
-
-static int
-VMWAREParseTopologyElement(ScrnInfoPtr pScrn,
-                           unsigned int output,
-                           const char *elementName,
-                           const char *element,
-                           const char *expectedTerminators,
-                           Bool needTerminator,
-                           unsigned int *outValue)
-{
-   char buf[10] = {0, };
-   size_t i = 0;
-   int retVal = -1;
-   const char *str = element;
-
-   for (i = 0; str[i] >= '0' && str[i] <= '9'; i++);
-   if (i == 0) {
-      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: unable to parse %s.\n",
-                 output, elementName);
-      goto exit;
-   }
-
-   strncpy(buf, str, i);
-   *outValue = atoi(buf);
-
-   if (*outValue > (unsigned short)-1) {
-      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: %s must be less than %hu.\n",
-                 output, elementName, (unsigned short)-1);
-      goto exit;
-   }
-
-   str += i;
-
-   if (needTerminator || str[0] != '\0') {
-      Bool unexpected = TRUE;
-
-      for (i = 0; i < strlen(expectedTerminators); i++) {
-         if (str[0] == expectedTerminators[i]) {
-            unexpected = FALSE;
-         }
-      }
-
-      if (unexpected) {
-         xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-                    "Output %u: unexpected character '%c' after %s.\n",
-                    output, str[0], elementName);
-         goto exit;
-      } else {
-         str++;
-      }
-   }
-
-   retVal = str - element;
-
- exit:
-   return retVal;
-}
-
-static xXineramaScreenInfo *
-VMWAREParseTopologyString(ScrnInfoPtr pScrn,
-                          const char *topology,
-                          unsigned int *retNumOutputs)
-{
-   xXineramaScreenInfo *extents = NULL;
-   unsigned int numOutputs = 0;
-   const char *str = topology;
-
-   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Starting...\n");
-
-   do {
-      unsigned int x, y, width, height;
-      int i;
-
-      i = VMWAREParseTopologyElement(pScrn, numOutputs, "width", str, "xX", TRUE, &width);
-      if (i == -1) {
-         goto error;
-      }
-      str += i;
-
-      i = VMWAREParseTopologyElement(pScrn, numOutputs, "height", str, "+", TRUE, &height);
-      if (i == -1) {
-         goto error;
-      }
-      str += i;
-
-      i= VMWAREParseTopologyElement(pScrn, numOutputs, "X offset", str, "+", TRUE, &x);
-      if (i == -1) {
-         goto error;
-      }
-      str += i;
-
-      i = VMWAREParseTopologyElement(pScrn, numOutputs, "Y offset", str, ";", FALSE, &y);
-      if (i == -1) {
-         goto error;
-      }
-      str += i;
-
-      xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Output %u: %ux%u+%u+%u\n",
-                 numOutputs, width, height, x, y);
-
-      numOutputs++;
-      extents = realloc(extents, numOutputs * sizeof (xXineramaScreenInfo));
-      extents[numOutputs - 1].x_org = x;
-      extents[numOutputs - 1].y_org = y;
-      extents[numOutputs - 1].width = width;
-      extents[numOutputs - 1].height = height;
-   } while (*str != 0);
-
-   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Succeeded.\n");
-   goto exit;
-
- error:
-   xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Parsing static Xinerama topology: Failed.\n");
-
-   free(extents);
-   extents = NULL;
-   numOutputs = 0;
-
- exit:
-   *retNumOutputs = numOutputs;
-   return extents;
-}
-
 
 static Bool
 VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
@@ -899,17 +586,13 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
 #endif
 
     xf86CollectOptions(pScrn, NULL);
-    if (!(options = malloc(sizeof(VMWAREOptions))))
+    if (!(options = VMWARECopyOptions()))
         return FALSE;
-    memcpy(options, VMWAREOptions, sizeof(VMWAREOptions));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, options);
 
     if (pScrn->depth <= 8) {
         pScrn->rgbBits = 8;
     }
-
-    from = X_PROBED;
-    pScrn->chipset = (char*)xf86TokenToString(VMWAREChipsets, DEVICE_ID(pVMWARE->PciInfo));
 
     if (!pScrn->chipset) {
         xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "ChipID 0x%04x is not recognised\n", DEVICE_ID(pVMWARE->PciInfo));
@@ -1608,46 +1291,6 @@ vmwareIsRegionEqual(const RegionPtr reg1,
     return TRUE;
 }
 
-#if VMWARE_DRIVER_FUNC
-static Bool
-VMWareDriverFunc(ScrnInfoPtr pScrn,
-                 xorgDriverFuncOp op,
-                 pointer data)
-{
-   CARD32 *flag;
-   xorgRRModeMM *modemm;
-
-   switch (op) {
-   case GET_REQUIRED_HW_INTERFACES:
-      flag = (CARD32 *)data;
-
-      if (flag) {
-         *flag = HW_IO | HW_MMIO;
-      }
-      return TRUE;
-   case RR_GET_MODE_MM:
-      modemm = (xorgRRModeMM *)data;
-
-      /*
-       * Because changing the resolution of the guest is usually changing the size
-       * of a window on the host desktop, the real physical DPI will not change. To
-       * keep the guest in sync, we scale the 'physical' screen dimensions to
-       * keep the DPI constant.
-       */
-      if (modemm && modemm->mode) {
-	  modemm->mmWidth = (modemm->mode->HDisplay * VMWARE_INCHTOMM +
-			     pScrn->xDpi / 2)  / pScrn->xDpi;
-	  modemm->mmHeight = (modemm->mode->VDisplay * VMWARE_INCHTOMM +
-			      pScrn->yDpi / 2) / pScrn->yDpi;
-      }
-      return TRUE;
-   default:
-      return FALSE;
-   }
-}
-#endif
-
-
 static Bool
 VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 {
@@ -1663,9 +1306,8 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
 
     xf86CollectOptions(pScrn, NULL);
-    if (!(options = malloc(sizeof(VMWAREOptions))))
+    if (!(options = VMWARECopyOptions()))
         return FALSE;
-    memcpy(options, VMWAREOptions, sizeof(VMWAREOptions));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, options);
 
     /*
@@ -1680,11 +1322,25 @@ VMWAREScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     }
 
 
-    if (useXinerama && xf86IsOptionSet(options, OPTION_STATIC_XINERAMA)) {
+    if (useXinerama && xf86IsOptionSet(options, OPTION_GUI_LAYOUT)) {
+       char *topology = xf86GetOptValString(options, OPTION_GUI_LAYOUT);
+       if (topology) {
+          pVMWARE->xineramaState =
+             VMWAREParseTopologyString(pScrn, topology,
+				       &pVMWARE->xineramaNumOutputs, "gui");
+
+         pVMWARE->xineramaStatic = pVMWARE->xineramaState != NULL;
+
+         free(topology);
+       }
+    } else if (useXinerama &&
+	       xf86IsOptionSet(options, OPTION_STATIC_XINERAMA)) {
        char *topology = xf86GetOptValString(options, OPTION_STATIC_XINERAMA);
        if (topology) {
           pVMWARE->xineramaState =
-             VMWAREParseTopologyString(pScrn, topology, &pVMWARE->xineramaNumOutputs);
+             VMWAREParseTopologyString(pScrn, topology,
+				       &pVMWARE->xineramaNumOutputs,
+				       "static Xinerama");
 
          pVMWARE->xineramaStatic = pVMWARE->xineramaState != NULL;
 
@@ -1986,155 +1642,14 @@ VMWAREValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
     return MODE_OK;
 }
 
-#if XSERVER_LIBPCIACCESS
-static Bool
-VMwarePciProbe (DriverPtr           drv,
-                int                 entity_num,
-                struct pci_device   *device,
-                intptr_t            match_data)
+void
+vmwlegacy_hookup(ScrnInfoPtr pScrn)
 {
-    ScrnInfoPtr     scrn = NULL;
-    EntityInfoPtr   entity;
-
-    scrn = xf86ConfigPciEntity(scrn, 0, entity_num, VMWAREPciChipsets,
-                               NULL, NULL, NULL, NULL, NULL);
-    if (scrn != NULL) {
-        scrn->driverVersion = VMWARE_DRIVER_VERSION;
-        scrn->driverName = VMWARE_DRIVER_NAME;
-        scrn->name = VMWARE_NAME;
-        scrn->Probe = NULL;
-    }
-
-    entity = xf86GetEntityInfo(entity_num);
-    switch (DEVICE_ID(device)) {
-    case PCI_CHIP_VMWARE0405:
-    case PCI_CHIP_VMWARE0710:
-        xf86MsgVerb(X_INFO, 4, "VMwarePciProbe: Valid device\n");
-        scrn->PreInit = VMWAREPreInit;
-        scrn->ScreenInit = VMWAREScreenInit;
-        scrn->SwitchMode = VMWARESwitchMode;
-        scrn->EnterVT = VMWAREEnterVT;
-        scrn->LeaveVT = VMWARELeaveVT;
-        scrn->FreeScreen = VMWAREFreeScreen;
-        scrn->ValidMode = VMWAREValidMode;
-        break;
-    default:
-        xf86MsgVerb(X_INFO, 4, "VMwarePciProbe: Unknown device\n");
-    }
-    return scrn != NULL;
+    pScrn->PreInit = VMWAREPreInit;
+    pScrn->ScreenInit = VMWAREScreenInit;
+    pScrn->SwitchMode = VMWARESwitchMode;
+    pScrn->EnterVT = VMWAREEnterVT;
+    pScrn->LeaveVT = VMWARELeaveVT;
+    pScrn->FreeScreen = VMWAREFreeScreen;
+    pScrn->ValidMode = VMWAREValidMode;
 }
-#else 
-
-static Bool
-VMWAREProbe(DriverPtr drv, int flags)
-{
-    int numDevSections, numUsed;
-    GDevPtr *devSections;
-    int *usedChips;
-    int i;
-    Bool foundScreen = FALSE;
-    char buildString[sizeof(VMWAREBuildStr)];
-
-    RewriteTagString(VMWAREBuildStr, buildString, sizeof(VMWAREBuildStr));
-    xf86MsgVerb(X_PROBED, 4, "%s", buildString);
-
-    numDevSections = xf86MatchDevice(VMWARE_DRIVER_NAME, &devSections);
-    if (numDevSections <= 0) {
-#ifdef DEBUG
-        xf86MsgVerb(X_ERROR, 0, "No vmware driver section\n");
-#endif
-        return FALSE;
-    }
-    if (xf86GetPciVideoInfo()) {
-        VmwareLog(("Some PCI Video Info Exists\n"));
-        numUsed = xf86MatchPciInstances(VMWARE_NAME, PCI_VENDOR_VMWARE,
-                                        VMWAREChipsets, VMWAREPciChipsets, devSections,
-                                        numDevSections, drv, &usedChips);
-        free(devSections);
-        if (numUsed <= 0)
-            return FALSE;
-        if (flags & PROBE_DETECT)
-            foundScreen = TRUE;
-        else
-            for (i = 0; i < numUsed; i++) {
-                ScrnInfoPtr pScrn = NULL;
-
-                VmwareLog(("Even some VMware SVGA PCI instances exists\n"));
-                pScrn = xf86ConfigPciEntity(pScrn, flags, usedChips[i],
-                                            VMWAREPciChipsets, NULL, NULL, NULL,
-                                            NULL, NULL);
-                if (pScrn) {
-                    VmwareLog(("And even configuration suceeded\n"));
-                    pScrn->driverVersion = VMWARE_DRIVER_VERSION;
-                    pScrn->driverName = VMWARE_DRIVER_NAME;
-                    pScrn->name = VMWARE_NAME;
-                    pScrn->Probe = VMWAREProbe;
-                    pScrn->PreInit = VMWAREPreInit;
-                    pScrn->ScreenInit = VMWAREScreenInit;
-                    pScrn->SwitchMode = VMWARESwitchMode;
-                    pScrn->AdjustFrame = VMWAREAdjustFrame;
-                    pScrn->EnterVT = VMWAREEnterVT;
-                    pScrn->LeaveVT = VMWARELeaveVT;
-                    pScrn->FreeScreen = VMWAREFreeScreen;
-                    pScrn->ValidMode = VMWAREValidMode;
-                    foundScreen = TRUE;
-                }
-            }
-        free(usedChips);
-    }
-    return foundScreen;
-}
-#endif
-
-
-_X_EXPORT DriverRec vmwlegacy = {
-    VMWARE_DRIVER_VERSION,
-    VMWARE_DRIVER_NAME,
-    VMWAREIdentify,
-#if XSERVER_LIBPCIACCESS
-    NULL,
-#else
-    VMWAREProbe,
-#endif
-    VMWAREAvailableOptions,
-    NULL,
-    0,
-#if VMWARE_DRIVER_FUNC
-    VMWareDriverFunc,
-#endif
-#if XSERVER_LIBPCIACCESS
-    VMwareDeviceMatch,
-    VMwarePciProbe,
-#endif
-};
-
-#ifdef XFree86LOADER
-static MODULESETUPPROTO(vmwlegacySetup);
-
-_X_EXPORT XF86ModuleData vmwlegacyModuleData = {
-    &vmwlegacyVersRec,
-    vmwlegacySetup,
-    NULL
-};
-
-static pointer
-vmwlegacySetup(pointer module, pointer opts, int *errmaj, int *errmin)
-{
-    static Bool setupDone = FALSE;
-
-    if (!setupDone) {
-        setupDone = TRUE;
-
-        xf86AddDriver(&vmwlegacy, module, VMWARE_DRIVER_FUNC);
-
-        LoaderRefSymLists(vgahwSymbols, fbSymbols, ramdacSymbols,
-                          shadowfbSymbols, NULL);
-
-        return (pointer)1;
-    }
-    if (errmaj) {
-        *errmaj = LDR_ONCEONLY;
-    }
-    return NULL;
-}
-#endif	/* XFree86LOADER */
