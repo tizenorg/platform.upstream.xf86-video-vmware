@@ -629,7 +629,6 @@ saa_compute_composite_regions(ScreenPtr pScreen,
 			      RegionPtr *mask_reg)
 {
     struct saa_screen_priv *sscreen = saa_screen(pScreen);
-    PixmapPtr dst_pixmap;
     RegionPtr srcReg = NULL;
     RegionPtr maskReg = NULL;
     Bool ret;
@@ -689,7 +688,7 @@ saa_compute_composite_regions(ScreenPtr pScreen,
     /*
      * Translate dst region to pixmap space.
      */
-    dst_pixmap = saa_get_pixmap(pDst->pDrawable, &xoff, &yoff);
+    (void) saa_get_pixmap(pDst->pDrawable, &xoff, &yoff);
     REGION_TRANSLATE(pScreen, dst_reg, pDst->pDrawable->x + xoff,
 		     pDst->pDrawable->y + yoff);
 

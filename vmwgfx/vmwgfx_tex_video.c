@@ -848,8 +848,4 @@ xorg_xv_init(ScreenPtr pScreen)
        xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
 		  "Disabling Xv because no adaptors could be initialized.\n");
    }
-
-
-  out_err_mem:
-   free(adaptors);
 }

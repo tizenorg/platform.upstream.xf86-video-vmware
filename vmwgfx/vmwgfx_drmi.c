@@ -452,7 +452,7 @@ vmwgfx_unref_stream(int drm_fd, uint32_t stream_id)
     ret = drmCommandWrite(drm_fd, DRM_VMW_UNREF_STREAM,
 			  &s_arg, sizeof(s_arg));
 
-    return 0;
+    return (ret != 0) ? -1 : 0;
 }
 
 int

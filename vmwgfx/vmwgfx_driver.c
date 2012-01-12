@@ -335,7 +335,6 @@ vmwgfx_set_topology(ScrnInfoPtr pScrn, const char *topology, const char *info)
 static Bool
 drv_pre_init(ScrnInfoPtr pScrn, int flags)
 {
-    xf86CrtcConfigPtr xf86_config;
     modesettingPtr ms;
     rgb defaultWeight = { 0, 0, 0 };
     EntityInfoPtr pEnt;
@@ -471,7 +470,6 @@ drv_pre_init(ScrnInfoPtr pScrn, int flags)
 
     /* Allocate an xf86CrtcConfig */
     xf86CrtcConfigInit(pScrn, &crtc_config_funcs);
-    xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
 
     /* get max width and height */
     {
@@ -732,6 +730,8 @@ drv_create_screen_resources(ScreenPtr pScreen)
     vmwgfx_swap(ms, pScreen, CreateScreenResources);
     ret = pScreen->CreateScreenResources(pScreen);
     vmwgfx_swap(ms, pScreen, CreateScreenResources);
+    if (!ret)
+	return ret;
 
     drv_adjust_frame(pScrn->scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
 
