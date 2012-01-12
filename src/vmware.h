@@ -42,6 +42,7 @@
 #include "vm_basic_types.h"
 #include "svga_reg.h"
 #include "svga_struct.h"
+#include "vmware_bootstrap.h"
 
 #if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 12
 #define _swapl(x, n) swapl(x,n)
@@ -207,15 +208,6 @@ static __inline ScrnInfoPtr infoFromScreen(ScreenPtr s) {
     }
 
 #define MOUSE_ID 1
-
-/*#define DEBUG_LOGGING*/
-#ifdef DEBUG_LOGGING
-# define VmwareLog(args) ErrorF args
-# define TRACEPOINT VmwareLog(("%s : %s\n", __FUNCTION__, __FILE__));
-#else
-# define VmwareLog(args)
-# define TRACEPOINT
-#endif
 
 /* Undefine this to kill all acceleration */
 #define ACCELERATE_OPS

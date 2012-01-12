@@ -45,7 +45,6 @@ typedef enum {
 } VMWAREOpts;
 
 OptionInfoPtr VMWARECopyOptions(void);
-const char **vgahwSymbols;
 
 void
 vmwlegacy_hookup(ScrnInfoPtr pScrn);
@@ -55,5 +54,18 @@ void
 vmwgfx_hookup(ScrnInfoPtr pScrn);
 #endif /* defined(BUILD_VMWGFX) */
 
+#ifdef XFree86LOADER
+void
+VMWARERefSymLists(void);
+#endif	/* XFree86LOADER */
+
+/*#define DEBUG_LOGGING*/
+#ifdef DEBUG_LOGGING
+# define VmwareLog(args) ErrorF args
+# define TRACEPOINT VmwareLog(("%s : %s\n", __FUNCTION__, __FILE__));
+#else
+# define VmwareLog(args)
+# define TRACEPOINT
+#endif
 
 #endif

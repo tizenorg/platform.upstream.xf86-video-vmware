@@ -17,9 +17,6 @@ char rcsId_vmware[] =
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
-#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 6
-#include "xf86Resources.h"
-#endif
 
 #include "compiler.h"	/* inb/outb */
 
@@ -48,7 +45,43 @@ char rcsId_vmware[] =
 #endif
 
 #if (GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) >= 5)
+
 #define xf86LoaderReqSymLists(...) do {} while (0)
+#define LoaderRefSymLists(...) do {} while (0)
+
+#else
+
+const char *vgahwSymbols[] = {
+    "vgaHWGetHWRec",
+    "vgaHWGetIOBase",
+    "vgaHWGetIndex",
+    "vgaHWInit",
+    "vgaHWProtect",
+    "vgaHWRestore",
+    "vgaHWSave",
+    "vgaHWSaveScreen",
+    "vgaHWUnlock",
+    NULL
+};
+
+static const char *fbSymbols[] = {
+    "fbCreateDefColormap",
+    "fbPictureInit",
+    "fbScreenInit",
+    NULL
+};
+
+static const char *ramdacSymbols[] = {
+    "xf86CreateCursorInfoRec",
+    "xf86DestroyCursorInfoRec",
+    "xf86InitCursor",
+    NULL
+};
+
+static const char *shadowfbSymbols[] = {
+    "ShadowFBInit2",
+    NULL
+};
 #endif
 
 /* Table of default modes to always add to the mode list. */
@@ -239,54 +272,6 @@ VMXGetVMwareSvgaId(VMWAREPtr pVMWARE)
     /* No supported VMware SVGA devices found */
     return SVGA_ID_INVALID;
 }
-
-#ifndef XSERVER_LIBPCIACCESS
-/*
- *----------------------------------------------------------------------
- *
- *  RewriteTagString --
- *
- *      Rewrites the given string, removing the $Name$, and
- *      replacing it with the contents.  The output string must
- *      have enough room, or else.
- *
- * Results:
- *
- *      Output string updated.
- *
- * Side effects:
- *      None.
- *
- *----------------------------------------------------------------------
- */
-
-static void
-RewriteTagString(const char *istr, char *ostr, int osize)
-{
-    int chr;
-    Bool inTag = FALSE;
-    char *op = ostr;
-
-    do {
-	chr = *istr++;
-	if (chr == '$') {
-	    if (inTag) {
-		inTag = FALSE;
-		for (; op > ostr && op[-1] == ' '; op--) {
-		}
-		continue;
-	    }
-	    if (strncmp(istr, "Name:", 5) == 0) {
-		istr += 5;
-		istr += strspn(istr, " ");
-		inTag = TRUE;
-		continue;
-	    }
-	}
-	*op++ = chr;
-    } while (chr);
-}
-#endif
 
 static Bool
 VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
@@ -1653,3 +1638,12 @@ vmwlegacy_hookup(ScrnInfoPtr pScrn)
     pScrn->FreeScreen = VMWAREFreeScreen;
     pScrn->ValidMode = VMWAREValidMode;
 }
+
+#ifdef XFree86LOADER
+void
+VMWARERefSymLists(void)
+{
+    LoaderRefSymLists(vgahwSymbols, fbSymbols, ramdacSymbols,
+		      shadowfbSymbols, NULL);
+}
+#endif	/* XFree86LOADER */

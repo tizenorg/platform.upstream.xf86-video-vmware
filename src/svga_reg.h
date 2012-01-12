@@ -75,6 +75,7 @@
 
 /* Base and Offset gets us headed the right way for PCI Base Addr Registers */
 #define SVGA_LEGACY_BASE_PORT	0x4560
+#define SVGA_NUM_PORTS          0x3
 
 #define SVGA_MAGIC         0x900000UL
 #define SVGA_MAKE_ID(ver)  (SVGA_MAGIC << 8 | (ver))

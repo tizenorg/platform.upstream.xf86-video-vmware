@@ -36,6 +36,15 @@
 #include "vm_device_version.h"
 #include "vmware_bootstrap.h"
 
+#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 6
+#include "xf86Resources.h"
+#endif
+
+#ifndef XSERVER_LIBPCIACCESS
+#include "vm_basic_types.h"
+#include "svga_reg.h"
+#endif
+
 #ifndef HAVE_XORG_SERVER_1_5_0
 #include <xf86_ansic.h>
 #include <xf86_libc.h>
@@ -295,6 +304,52 @@ VMwarePciProbe (DriverPtr           drv,
 }
 #else
 
+/*
+ *----------------------------------------------------------------------
+ *
+ *  RewriteTagString --
+ *
+ *      Rewrites the given string, removing the $Name$, and
+ *      replacing it with the contents.  The output string must
+ *      have enough room, or else.
+ *
+ * Results:
+ *
+ *      Output string updated.
+ *
+ * Side effects:
+ *      None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+RewriteTagString(const char *istr, char *ostr, int osize)
+{
+    int chr;
+    Bool inTag = FALSE;
+    char *op = ostr;
+
+    do {
+	chr = *istr++;
+	if (chr == '$') {
+	    if (inTag) {
+		inTag = FALSE;
+		for (; op > ostr && op[-1] == ' '; op--) {
+		}
+		continue;
+	    }
+	    if (strncmp(istr, "Name:", 5) == 0) {
+		istr += 5;
+		istr += strspn(istr, " ");
+		inTag = TRUE;
+		continue;
+	    }
+	}
+	*op++ = chr;
+    } while (chr);
+}
+
 static Bool
 VMWAREProbe(DriverPtr drv, int flags)
 {
@@ -339,16 +394,15 @@ VMWAREProbe(DriverPtr drv, int flags)
                     pScrn->driverName = VMWARE_DRIVER_NAME;
                     pScrn->name = VMWARE_NAME;
                     pScrn->Probe = VMWAREProbe;
-                    pScrn->PreInit = VMWAREPreInit;
 
 #ifdef BUILD_VMWGFX
-		    vmwgfx_hookup(scrn);
+		    vmwgfx_hookup(pScrn);
 #else
-		    vmwlegacy_hookup(scrn);
+		    vmwlegacy_hookup(pScrn);
 #endif /* defined(BUILD_VMWGFX) */
 
-		    scrn->driverPrivate = scrn->PreInit;
-		    scrn->PreInit = VMwarePreinitStub;
+		    pScrn->driverPrivate = pScrn->PreInit;
+		    pScrn->PreInit = VMwarePreinitStub;
                     foundScreen = TRUE;
                 }
             }
@@ -431,45 +485,6 @@ _X_EXPORT DriverRec vmware = {
 #endif
 };
 
-#if (GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) >= 5)
-
-#define xf86LoaderReqSymLists(...) do {} while (0)
-#define LoaderRefSymLists(...) do {} while (0)
-
-#else
-
-const char *vgahwSymbols[] = {
-    "vgaHWGetHWRec",
-    "vgaHWGetIOBase",
-    "vgaHWGetIndex",
-    "vgaHWInit",
-    "vgaHWProtect",
-    "vgaHWRestore",
-    "vgaHWSave",
-    "vgaHWSaveScreen",
-    "vgaHWUnlock",
-    NULL
-};
-
-static const char *fbSymbols[] = {
-    "fbCreateDefColormap",
-    "fbPictureInit",
-    "fbScreenInit",
-    NULL
-};
-
-static const char *ramdacSymbols[] = {
-    "xf86CreateCursorInfoRec",
-    "xf86DestroyCursorInfoRec",
-    "xf86InitCursor",
-    NULL
-};
-
-static const char *shadowfbSymbols[] = {
-    "ShadowFBInit2",
-    NULL
-};
-#endif
 
 #ifdef XFree86LOADER
 static MODULESETUPPROTO(vmwareSetup);
@@ -490,8 +505,7 @@ vmwareSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 
         xf86AddDriver(&vmware, module, VMWARE_DRIVER_FUNC);
 
-        LoaderRefSymLists(vgahwSymbols, fbSymbols, ramdacSymbols,
-                          shadowfbSymbols, NULL);
+        VMWARERefSymLists();
 
         return (pointer)1;
     }
