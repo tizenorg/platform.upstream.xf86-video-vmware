@@ -78,7 +78,10 @@ typedef int8_t int8;
 typedef uint8_t uint8;
 #include "./src/svga_reg.h"
 
-#define XA_VERSION_MINOR_REQUIRED 6
+#define XA_VERSION_MINOR_REQUIRED 0
+#define XA_VERSION_MAJOR_REQUIRED 1
+#define XA_VERSION_MAJOR_COMPAT 1
+
 #define DRM_VERSION_MAJOR_REQUIRED 2
 #define DRM_VERSION_MINOR_REQUIRED 3
 
@@ -973,25 +976,15 @@ drv_screen_init(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 		       "Gallium3D XA version: %d.%d.%d.\n",
 		       major, minor, patch);
 
-	    if (XA_TRACKER_VERSION_MAJOR == 0) {
-		if (minor != XA_TRACKER_VERSION_MINOR) {
-		    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-			       "Expecting XA version 0.%d.x.\n",
-			       XA_TRACKER_VERSION_MINOR);
-		    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-			       "No render acceleration available.\n");
-		    xa_tracker_destroy(ms->xat);
-		    ms->xat = NULL;
-		    ms->from_render = X_PROBED;
-		}
-	    }
-	    if (major != XA_TRACKER_VERSION_MAJOR ||
-		minor < XA_VERSION_MINOR_REQUIRED) {
+	    if (major < XA_VERSION_MAJOR_REQUIRED ||
+		major > XA_VERSION_MAJOR_COMPAT ||
+		(major == XA_VERSION_MAJOR_REQUIRED &&
+		 minor < XA_VERSION_MINOR_REQUIRED)) {
 		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
 			   "Expecting %d.%d.x >= XA version < %d.0.0.\n",
-			   XA_TRACKER_VERSION_MAJOR,
+			   XA_VERSION_MAJOR_REQUIRED,
 			   XA_VERSION_MINOR_REQUIRED,
-			   XA_TRACKER_VERSION_MAJOR + 1);
+			   XA_VERSION_MAJOR_COMPAT + 1);
 		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
 			   "No render acceleration available.\n");
 		xa_tracker_destroy(ms->xat);
