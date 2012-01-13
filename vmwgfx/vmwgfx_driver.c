@@ -76,7 +76,7 @@ typedef uint16_t uint16;
 
 typedef int8_t int8;
 typedef uint8_t uint8;
-#include "./src/svga_reg.h"
+#include "../src/svga_reg.h"
 
 #define XA_VERSION_MINOR_REQUIRED 0
 #define XA_VERSION_MAJOR_REQUIRED 1

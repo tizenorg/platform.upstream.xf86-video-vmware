@@ -125,7 +125,7 @@ if test x$BUILD_VMWGFX = xyes; then
 	AC_MSG_RESULT([yes])
 	AC_SYS_LARGEFILE
 	VMWGFX_DIRS="saa vmwgfx"
-	VMWGFX_LIBADD='$(top_srcdir)/vmwgfx/libvmwgfx.la'
+	VMWGFX_LIBADD='$(top_builddir)/vmwgfx/libvmwgfx.la'
 	AC_CONFIG_FILES([
 			saa/Makefile
 			vmwgfx/Makefile
