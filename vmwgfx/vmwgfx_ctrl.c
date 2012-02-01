@@ -73,10 +73,10 @@ VMwareCtrlQueryVersion(ClientPtr client)
    rep.majorVersion = VMWARE_CTRL_MAJOR_VERSION;
    rep.minorVersion = VMWARE_CTRL_MINOR_VERSION;
    if (client->swapped) {
-      swaps(&rep.sequenceNumber, n);
-      swapl(&rep.length, n);
-      swapl(&rep.majorVersion, n);
-      swapl(&rep.minorVersion, n);
+      _swaps(&rep.sequenceNumber, n);
+      _swapl(&rep.length, n);
+      _swapl(&rep.majorVersion, n);
+      _swapl(&rep.minorVersion, n);
    }
    WriteToClient(client, sizeof(xVMwareCtrlQueryVersionReply), (char *)&rep);
 
@@ -171,11 +171,11 @@ VMwareCtrlSetRes(ClientPtr client)
    rep.x = stuff->x;
    rep.y = stuff->y;
    if (client->swapped) {
-      swaps(&rep.sequenceNumber, n);
-      swapl(&rep.length, n);
-      swapl(&rep.screen, n);
-      swapl(&rep.x, n);
-      swapl(&rep.y, n);
+      _swaps(&rep.sequenceNumber, n);
+      _swapl(&rep.length, n);
+      _swapl(&rep.screen, n);
+      _swapl(&rep.x, n);
+      _swapl(&rep.y, n);
    }
    WriteToClient(client, sizeof(xVMwareCtrlSetResReply), (char *)&rep);
 
@@ -278,9 +278,9 @@ VMwareCtrlSetTopology(ClientPtr client)
    rep.sequenceNumber = client->sequence;
    rep.screen = stuff->screen;
    if (client->swapped) {
-      swaps(&rep.sequenceNumber, n);
-      swapl(&rep.length, n);
-      swapl(&rep.screen, n);
+      _swaps(&rep.sequenceNumber, n);
+      _swapl(&rep.length, n);
+      _swapl(&rep.screen, n);
    }
    WriteToClient(client, sizeof(xVMwareCtrlSetTopologyReply), (char *)&rep);
 
@@ -347,7 +347,7 @@ SVMwareCtrlQueryVersion(ClientPtr client)
    REQUEST(xVMwareCtrlQueryVersionReq);
    REQUEST_SIZE_MATCH(xVMwareCtrlQueryVersionReq);
 
-   swaps(&stuff->length, n);
+   _swaps(&stuff->length, n);
 
    return VMwareCtrlQueryVersion(client);
 }
@@ -378,10 +378,10 @@ SVMwareCtrlSetRes(ClientPtr client)
    REQUEST(xVMwareCtrlSetResReq);
    REQUEST_SIZE_MATCH(xVMwareCtrlSetResReq);
 
-   swaps(&stuff->length, n);
-   swapl(&stuff->screen, n);
-   swapl(&stuff->x, n);
-   swapl(&stuff->y, n);
+   _swaps(&stuff->length, n);
+   _swapl(&stuff->screen, n);
+   _swapl(&stuff->x, n);
+   _swapl(&stuff->y, n);
 
    return VMwareCtrlSetRes(client);
 }
@@ -412,9 +412,9 @@ SVMwareCtrlSetTopology(ClientPtr client)
    REQUEST(xVMwareCtrlSetTopologyReq);
    REQUEST_SIZE_MATCH(xVMwareCtrlSetTopologyReq);
 
-   swaps(&stuff->length, n);
-   swapl(&stuff->screen, n);
-   swapl(&stuff->number, n);
+   _swaps(&stuff->length, n);
+   _swapl(&stuff->screen, n);
+   _swapl(&stuff->number, n);
    /* Each extent is a struct of shorts. */
    SwapRestS(stuff);
 
