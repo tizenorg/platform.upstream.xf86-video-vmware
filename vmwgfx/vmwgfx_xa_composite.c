@@ -33,8 +33,8 @@
 #include "config.h"
 #endif
 
+#include <pixman.h>
 #include <picturestr.h>
-#include <X11/extensions/Xrender.h>
 #include "xa_composite.h"
 #include "vmwgfx_saa.h"
 #include "vmwgfx_saa_priv.h"
@@ -75,17 +75,17 @@ vmwgfx_matrix_from_pict_transform(PictTransform *trans, float *matrix)
    if (!trans)
       return FALSE;
 
-   matrix[0] = XFixedToDouble(trans->matrix[0][0]);
-   matrix[3] = XFixedToDouble(trans->matrix[0][1]);
-   matrix[6] = XFixedToDouble(trans->matrix[0][2]);
+   matrix[0] = pixman_fixed_to_double(trans->matrix[0][0]);
+   matrix[3] = pixman_fixed_to_double(trans->matrix[0][1]);
+   matrix[6] = pixman_fixed_to_double(trans->matrix[0][2]);
 
-   matrix[1] = XFixedToDouble(trans->matrix[1][0]);
-   matrix[4] = XFixedToDouble(trans->matrix[1][1]);
-   matrix[7] = XFixedToDouble(trans->matrix[1][2]);
+   matrix[1] = pixman_fixed_to_double(trans->matrix[1][0]);
+   matrix[4] = pixman_fixed_to_double(trans->matrix[1][1]);
+   matrix[7] = pixman_fixed_to_double(trans->matrix[1][2]);
 
-   matrix[2] = XFixedToDouble(trans->matrix[2][0]);
-   matrix[5] = XFixedToDouble(trans->matrix[2][1]);
-   matrix[8] = XFixedToDouble(trans->matrix[2][2]);
+   matrix[2] = pixman_fixed_to_double(trans->matrix[2][0]);
+   matrix[5] = pixman_fixed_to_double(trans->matrix[2][1]);
+   matrix[8] = pixman_fixed_to_double(trans->matrix[2][2]);
 
    return TRUE;
 }
