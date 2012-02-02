@@ -31,7 +31,6 @@
 
 #include "xf86.h"
 #include "compiler.h"
-#include "xf86PciInfo.h"	/* pci vendor id */
 #include "xf86Pci.h"		/* pci */
 #include "vm_device_version.h"
 #include "vmware_bootstrap.h"
@@ -67,20 +66,6 @@
  */
 #ifndef XORG_VERSION_CURRENT
 #define XORG_VERSION_CURRENT XF86_VERSION_CURRENT
-#endif
-
-/*
- * Sanity check that xf86PciInfo.h has the correct values (which come from
- * the VMware source tree in vm_device_version.h.
- */
-#if PCI_CHIP_VMWARE0405 != PCI_DEVICE_ID_VMWARE_SVGA2
-#error "PCI_CHIP_VMWARE0405 is wrong, update it from vm_device_version.h"
-#endif
-#if PCI_CHIP_VMWARE0710 != PCI_DEVICE_ID_VMWARE_SVGA
-#error "PCI_CHIP_VMWARE0710 is wrong, update it from vm_device_version.h"
-#endif
-#if PCI_VENDOR_VMWARE != PCI_VENDOR_ID_VMWARE
-#error "PCI_VENDOR_VMWARE is wrong, update it from vm_device_version.h"
 #endif
 
 /*
@@ -147,11 +132,11 @@ static resRange vmwareLegacyRes[] = {
 #if XSERVER_LIBPCIACCESS
 
 #define VMWARE_DEVICE_MATCH(d, i) \
-    {PCI_VENDOR_VMWARE, (d), PCI_MATCH_ANY, PCI_MATCH_ANY, 0, 0, (i) }
+    {PCI_VENDOR_ID_VMWARE, (d), PCI_MATCH_ANY, PCI_MATCH_ANY, 0, 0, (i) }
 
 static const struct pci_id_match VMwareDeviceMatch[] = {
-    VMWARE_DEVICE_MATCH (PCI_CHIP_VMWARE0405, 0 ),
-    VMWARE_DEVICE_MATCH (PCI_CHIP_VMWARE0710, 0 ),
+    VMWARE_DEVICE_MATCH (PCI_DEVICE_ID_VMWARE_SVGA2, 0 ),
+    VMWARE_DEVICE_MATCH (PCI_DEVICE_ID_VMWARE_SVGA, 0 ),
     { 0, 0, 0 },
 };
 #endif
@@ -164,14 +149,14 @@ static const struct pci_id_match VMwareDeviceMatch[] = {
  */
 
 static PciChipsets VMWAREPciChipsets[] = {
-    { PCI_CHIP_VMWARE0405, PCI_CHIP_VMWARE0405, RES_EXCLUSIVE_VGA },
-    { PCI_CHIP_VMWARE0710, PCI_CHIP_VMWARE0710, vmwareLegacyRes },
+    { PCI_DEVICE_ID_VMWARE_SVGA2, PCI_DEVICE_ID_VMWARE_SVGA2, RES_EXCLUSIVE_VGA },
+    { PCI_DEVICE_ID_VMWARE_SVGA, PCI_DEVICE_ID_VMWARE_SVGA, vmwareLegacyRes },
     { -1,		       -1,		    RES_UNDEFINED }
 };
 
 static SymTabRec VMWAREChipsets[] = {
-    { PCI_CHIP_VMWARE0405, "vmware0405" },
-    { PCI_CHIP_VMWARE0710, "vmware0710" },
+    { PCI_DEVICE_ID_VMWARE_SVGA2, "vmware0405" },
+    { PCI_DEVICE_ID_VMWARE_SVGA, "vmware0710" },
     { -1,                  NULL }
 };
 
@@ -284,8 +269,8 @@ VMwarePciProbe (DriverPtr           drv,
 
     entity = xf86GetEntityInfo(entity_num);
     switch (DEVICE_ID(device)) {
-    case PCI_CHIP_VMWARE0405:
-    case PCI_CHIP_VMWARE0710:
+    case PCI_DEVICE_ID_VMWARE_SVGA2:
+    case PCI_DEVICE_ID_VMWARE_SVGA:
         xf86MsgVerb(X_INFO, 4, "VMwarePciProbe: Valid device\n");
 
 #ifdef BUILD_VMWGFX
@@ -372,7 +357,7 @@ VMWAREProbe(DriverPtr drv, int flags)
     }
     if (xf86GetPciVideoInfo()) {
         VmwareLog(("Some PCI Video Info Exists\n"));
-        numUsed = xf86MatchPciInstances(VMWARE_NAME, PCI_VENDOR_VMWARE,
+        numUsed = xf86MatchPciInstances(VMWARE_NAME, PCI_VENDOR_ID_VMWARE,
                                         VMWAREChipsets, VMWAREPciChipsets, devSections,
                                         numDevSections, drv, &usedChips);
         free(devSections);

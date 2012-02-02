@@ -29,7 +29,6 @@
 
 #include "compiler.h"	        /* inb/outb */
 
-#include "xf86PciInfo.h"	/* pci vendor id */
 #include "xf86Pci.h"		/* pci */
 #include "xf86Cursor.h"		/* hw cursor */
 #include "cursorstr.h"          /* xhot/yhot */
@@ -43,13 +42,14 @@
 #include "svga_reg.h"
 #include "svga_struct.h"
 #include "vmware_bootstrap.h"
+#include <xf86Module.h>
 
 #if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 12
 #define _swapl(x, n) swapl(x,n)
 #define _swaps(x, n) swaps(x,n)
 #else
-#define _swapl(x, n) swapl(x)
-#define _swaps(x, n) swaps(x)
+#define _swapl(x, n) (void) n; swapl(x)
+#define _swaps(x, n) (void) n; swaps(x)
 #endif
 
 /*
@@ -151,7 +151,7 @@ typedef struct {
         uint32 sourcePixmap[SVGA_PIXMAP_SIZE(MAX_CURS, MAX_CURS, 32)];
     } hwcur;
 
-    IOADDRESS indexReg, valueReg;
+    unsigned long indexReg, valueReg;
 
     ScreenRec ScrnFuncs;
 

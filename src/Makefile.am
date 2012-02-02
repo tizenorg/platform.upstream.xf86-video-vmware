@@ -26,7 +26,7 @@
 
 vmware_drv_la_LTLIBRARIES = vmware_drv.la
 vmware_drv_la_LDFLAGS = -module -avoid-version
-vmware_drv_la_CFLAGS = @XORG_CFLAGS@
+vmware_drv_la_CFLAGS = $(CWARNFLAGS) @XORG_CFLAGS@
 vmware_drv_ladir = @moduledir@/drivers
 vmware_drv_la_LIBADD = @VMWGFX_LIBADD@
 vmware_drv_la_DEPENDENCIES = @VMWGFX_LIBADD@
