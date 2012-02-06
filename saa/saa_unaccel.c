@@ -378,6 +378,105 @@ saa_check_poly_arc(DrawablePtr pDrawable, GCPtr pGC, int narcs, xArc * pArcs)
     sscreen->fallback_count--;
 }
 
+
+/**
+ * saa_check_poly_fill_rect_noreadback - PolyFillRect avoiding unnecessary readbacks.
+ *
+ * @pDrawable: The drawable on which to fill.
+ * @pGC: Pointer to the GC to use.
+ * @nrect: Number of rectangles to fill.
+ * @xRectangle: Pointer to rectangles to fill.
+ *
+ * During a standard saa polyFillRect, the damage region is usually the bounding
+ * box of all rectangles. Since we mark the software pixmap dirty based on that
+ * damage region, we need to read all of it back first, even if the fill operation
+ * itself doesn't read anything. This version of polyFillRect improves on that by
+ * only damaging the area we actually fill. If it's a non-reading fill we thus don't
+ * need to read back anything, but this may come at the cost of increased dirty
+ * region fragmentation. In any case, this greatly improves on the performance of
+ * shaped windows on top of accelerated contents, for example unscaled OSD in xine.
+ */
+static Bool
+saa_check_poly_fill_rect_noreadback(DrawablePtr pDrawable, GCPtr pGC,
+				    int nrect, xRectangle *prect)
+{
+    struct saa_gc_priv *sgc = saa_gc(pGC);
+    struct saa_screen_priv *sscreen = saa_screen(pGC->pScreen);
+    RegionPtr region;
+    saa_access_t access;
+    Bool ret;
+    PixmapPtr pPixmap;
+    xRectangle *prect_save = prect;
+    int xoff, yoff;
+    struct saa_pixmap *spix;
+
+    if (!nrect)
+	return TRUE;
+
+    sscreen->fallback_count++;
+
+    pPixmap = saa_get_pixmap(pDrawable, &xoff, &yoff);
+    spix = saa_get_saa_pixmap(pPixmap);
+    region = RECTS_TO_REGION(pGC->pScreen, nrect, prect, CT_UNSORTED);
+    if (!region)
+	goto out_no_region;
+
+    REGION_TRANSLATE(pGC->pScreen, region, xoff + pDrawable->x,
+		     yoff + pDrawable->y);
+
+
+    access = SAA_ACCESS_W;
+    if (saa_gc_reads_destination(pDrawable, pGC)) {
+	/*
+	 * We need to do a readback anyway. In case of more than an
+	 * ad hoc number of say 10 rectangles, we might as well do a
+	 * readback of the whole damage area to avoid fragmentation.
+	 */
+	access |= SAA_ACCESS_R;
+	ret = saa_prepare_access_pixmap(pPixmap, access, region);
+    } else
+	ret = saa_prepare_access_pixmap(pPixmap, access, NULL);
+
+    if (!ret)
+	goto out_no_access;
+
+    if (!saa_prepare_access_gc(pGC))
+	goto out_no_gc;
+
+    saa_swap(sgc, pGC, ops);
+    pGC->ops->PolyFillRect(pDrawable, pGC, nrect, prect_save);
+    saa_swap(sgc, pGC, ops);
+
+    saa_finish_access_gc(pGC);
+    saa_finish_access_pixmap(pPixmap, access);
+
+    if (spix->damage) {
+	/*
+	 * Not sure why the region can be larger than the pending damage region
+	 * at this point, (happens on clipped-away drawables). To avoid potential
+	 * rendering problems, we clip to the pending damage region.
+	 */
+	REGION_INTERSECT(pGC->pScreen, region, region, saa_pix_damage_pending(spix));
+
+	saa_pixmap_dirty(pPixmap, FALSE, region);
+    }
+
+    REGION_DESTROY(pGC->pScreen, region);
+
+    sscreen->fallback_count--;
+
+    return TRUE;
+
+  out_no_gc:
+    saa_finish_access_pixmap(pPixmap, access);
+  out_no_access:
+    REGION_DESTROY(pGC->pScreen, region);
+  out_no_region:
+    sscreen->fallback_count--;
+
+    return FALSE;
+}
+
 void
 saa_check_poly_fill_rect(DrawablePtr pDrawable, GCPtr pGC,
 			 int nrect, xRectangle * prect)
@@ -387,6 +486,9 @@ saa_check_poly_fill_rect(DrawablePtr pDrawable, GCPtr pGC,
     struct saa_screen_priv *sscreen = saa_screen(pGC->pScreen);
 
     SAA_FALLBACK(("to %p (%c)\n", pDrawable, saa_drawable_loc(pDrawable)));
+
+    if (saa_check_poly_fill_rect_noreadback(pDrawable, pGC, nrect, prect))
+	return;
 
     sscreen->fallback_count++;
 
