@@ -607,12 +607,19 @@ VMWAREPreInit(ScrnInfoPtr pScrn, int flags)
         from = X_CONFIG;
     }
 
-    width = vmwareReadReg(pVMWARE, SVGA_REG_MAX_WIDTH);
-    height = vmwareReadReg(pVMWARE, SVGA_REG_MAX_HEIGHT);
+    width = vmwareReadReg(pVMWARE, SVGA_REG_WIDTH);
+    height = vmwareReadReg(pVMWARE, SVGA_REG_HEIGHT);
     width = MAX(width, VMW_MIN_INITIAL_WIDTH);
     height = MAX(height, VMW_MIN_INITIAL_HEIGHT);
-    width = MIN(width, pVMWARE->maxWidth);
-    height = MIN(height, pVMWARE->maxHeight);
+
+    if (width > pVMWARE->maxWidth || height > pVMWARE->maxHeight) {
+	/*
+	 * This is an error condition and shouldn't happen.
+	 * revert to MIN_INITIAL_ values
+	 */
+	width = VMW_MIN_INITIAL_WIDTH;
+	height = VMW_MIN_INITIAL_HEIGHT;
+    }
 
     xf86DrvMsg(pScrn->scrnIndex, from,
 	       "Will %sset up a driver mode with dimensions %dx%d.\n",
