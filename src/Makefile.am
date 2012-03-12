@@ -28,8 +28,11 @@ vmware_drv_la_LTLIBRARIES = vmware_drv.la
 vmware_drv_la_LDFLAGS = -module -avoid-version
 vmware_drv_la_CFLAGS = $(CWARNFLAGS) @XORG_CFLAGS@
 vmware_drv_ladir = @moduledir@/drivers
-vmware_drv_la_LIBADD = @VMWGFX_LIBADD@
-vmware_drv_la_DEPENDENCIES = @VMWGFX_LIBADD@
+
+if BUILD_VMWGFX
+vmware_drv_la_LIBADD = $(top_builddir)/vmwgfx/libvmwgfx.la
+vmware_drv_la_DEPENDENCIES = $(top_builddir)/vmwgfx/libvmwgfx.la
+endif
 
 vmware_drv_la_SOURCES = \
 	bits2pixels.c \

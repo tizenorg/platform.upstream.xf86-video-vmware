@@ -1,3 +1,5 @@
+
+if BUILD_VMWGFX
 noinst_LTLIBRARIES = libsaa.la
 
 libsaa_la_CFLAGS = $(CWARNFLAGS) $(XORG_CFLAGS)
@@ -10,4 +12,4 @@ libsaa_la_SOURCES = \
 	saa_render.c \
 	saa_accel.c \
 	saa.h
-
+endif
