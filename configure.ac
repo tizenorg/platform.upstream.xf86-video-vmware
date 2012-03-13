@@ -29,6 +29,7 @@ AC_INIT([xf86-video-vmware],
 AC_CONFIG_SRCDIR([Makefile.am])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR(.)
+AC_SYS_LARGEFILE
 
 # Initialize Automake
 AM_INIT_AUTOMAKE([foreign dist-bzip2])
@@ -122,7 +123,6 @@ AC_SUBST([DRIVER_NAME])
 AC_MSG_CHECKING([whether to build Kernel Mode Setting and 3D])
 if test x$BUILD_VMWGFX = xyes; then
 	AC_MSG_RESULT([yes])
-	AC_SYS_LARGEFILE
         AC_DEFINE([BUILD_VMWGFX], 1, [Building the vmwgfx driver path])
 else
 	AC_MSG_RESULT([no])
