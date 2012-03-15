@@ -1151,11 +1151,9 @@ vmwgfx_composite_prepare(struct saa_driver *driver, CARD8 op,
     if (xa_composite_prepare(vsaa->xa_ctx, xa_comp))
 	goto out_err;
 
-    REGION_UNINIT(pScreen, &empty);
     return TRUE;
 
   out_err:
-    REGION_UNINIT(pScreen, &empty);
     return FALSE;
 }
 
