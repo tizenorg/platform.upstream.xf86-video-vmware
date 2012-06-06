@@ -177,7 +177,7 @@ typedef struct {
 #define VMWAREPTR(p) ((VMWAREPtr)((p)->driverPrivate))
 
 static __inline ScrnInfoPtr infoFromScreen(ScreenPtr s) {
-    return xf86Screens[s->myNum];
+    return xf86ScreenToScrn(s);
 }
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
