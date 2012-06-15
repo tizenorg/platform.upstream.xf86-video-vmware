@@ -18,6 +18,7 @@
 #include "xf86.h"
 #include "xf86_OSproc.h"
 
+#include "compat-api.h"
 
 #include <X11/extensions/panoramiXproto.h>
 
