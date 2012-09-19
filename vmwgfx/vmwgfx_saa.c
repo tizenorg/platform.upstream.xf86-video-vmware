@@ -279,40 +279,40 @@ vmwgfx_saa_dma(struct vmwgfx_saa *vsaa,
 	       Bool to_hw)
 {
     struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(pixmap);
+    void *data = vpix->malloc;
+    int ret;
 
     if (!vpix->hw || (!vpix->gmr && !vpix->malloc))
 	return TRUE;
 
-    if (vpix->gmr && vsaa->can_optimize_dma) {
-	uint32_t handle, dummy;
 
-	if (xa_surface_handle(vpix->hw, xa_handle_type_shared,
-		 &handle, &dummy) != 0)
-	    goto out_err;
-	if (vmwgfx_dma(0, 0, reg, vpix->gmr, pixmap->devKind, handle,
-		       to_hw) != 0)
-	    goto out_err;
-    } else {
-	void *data = vpix->malloc;
-	int ret;
-
-	if (vpix->gmr) {
-	    data = vmwgfx_dmabuf_map(vpix->gmr);
-	    if (!data)
-		goto out_err;
-	}
-
-	ret = xa_surface_dma(vsaa->xa_ctx, vpix->hw, data, pixmap->devKind,
-			     (int) to_hw,
-			     (struct xa_box *) REGION_RECTS(reg),
-			     REGION_NUM_RECTS(reg));
-	if (to_hw)
-	    xa_context_flush(vsaa->xa_ctx);
-	if (vpix->gmr)
-	    vmwgfx_dmabuf_unmap(vpix->gmr);
-	if (ret)
+    if (vpix->gmr) {
+	data = vmwgfx_dmabuf_map(vpix->gmr);
+	if (!data)
 	    goto out_err;
     }
+
+    ret = xa_surface_dma(vsaa->xa_ctx, vpix->hw, data, pixmap->devKind,
+			 (int) to_hw,
+			 (struct xa_box *) REGION_RECTS(reg),
+			 REGION_NUM_RECTS(reg));
+    if (vpix->gmr)
+	vmwgfx_dmabuf_unmap(vpix->gmr);
+
+    if (ret)
+	goto out_err;
+
+    ret = xa_surface_dma(vsaa->xa_ctx, vpix->hw, data, pixmap->devKind,
+			 (int) to_hw,
+			 (struct xa_box *) REGION_RECTS(reg),
+			 REGION_NUM_RECTS(reg));
+    if (to_hw)
+	xa_context_flush(vsaa->xa_ctx);
+    if (vpix->gmr)
+	vmwgfx_dmabuf_unmap(vpix->gmr);
+    if (ret)
+	goto out_err;
+
     return TRUE;
   out_err:
     LogMessage(X_ERROR, "DMA %s surface failed.\n",
@@ -1372,7 +1372,6 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
 	vsaa->xa_ctx = xa_context_default(xat);
     vsaa->drm_fd = drm_fd;
     vsaa->present_flush = present_flush;
-    vsaa->can_optimize_dma = FALSE;
     vsaa->use_present_opt = direct_presents;
     vsaa->only_hw_presents = only_hw_presents;
     vsaa->rendercheck = rendercheck;

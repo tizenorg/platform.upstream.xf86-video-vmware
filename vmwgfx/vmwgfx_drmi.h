@@ -60,11 +60,6 @@ extern void
 vmwgfx_dmabuf_unmap(struct vmwgfx_dmabuf *buf);
 
 extern int
-vmwgfx_dma(unsigned int host_x, unsigned int host_y,
-	   RegionPtr region, struct vmwgfx_dmabuf *buf,
-	   uint32_t buf_pitch, uint32_t surface_handle, int to_surface);
-
-extern int
 vmwgfx_num_streams(int drm_fd, uint32_t *ntot, uint32_t *nfree);
 
 extern int
