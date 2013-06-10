@@ -199,7 +199,7 @@ stop_video(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
 
        for (i=0; i<3; ++i) {
 	   if (priv->yuv[i]) {
-	       xa_surface_destroy(priv->yuv[i]);
+	       xa_surface_unref(priv->yuv[i]);
 	       priv->yuv[i] = NULL;
 	   }
 	   for (j=0; j<2; ++j) {
@@ -539,7 +539,8 @@ copy_packed_data(ScrnInfoPtr pScrn,
 	       REGION_RESET(pScrn->pScreen, &reg, &box);
 	   }
 
-	   if (xa_surface_handle(srf, &handle, &stride) != 0) {
+	   if (xa_surface_handle(srf, xa_handle_type_shared,
+			&handle, &stride) != 0) {
 	       ret = BadAlloc;
 	       break;
 	   }

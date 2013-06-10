@@ -140,7 +140,7 @@ vmwgfx_pixmap_free_storage(struct vmwgfx_saa_pixmap *vpix)
 	vpix->malloc = NULL;
     }
     if (!(vpix->backing & VMWGFX_PIX_SURFACE) && vpix->hw) {
-	xa_surface_destroy(vpix->hw);
+	xa_surface_unref(vpix->hw);
 	vpix->hw = NULL;
     }
     if (!(vpix->backing & VMWGFX_PIX_GMR) && vpix->gmr) {
@@ -286,7 +286,8 @@ vmwgfx_saa_dma(struct vmwgfx_saa *vsaa,
     if (vpix->gmr && vsaa->can_optimize_dma) {
 	uint32_t handle, dummy;
 
-	if (xa_surface_handle(vpix->hw, &handle, &dummy) != 0)
+	if (xa_surface_handle(vpix->hw, xa_handle_type_shared,
+		 &handle, &dummy) != 0)
 	    goto out_err;
 	if (vmwgfx_dma(0, 0, reg, vpix->gmr, pixmap->devKind, handle,
 		       to_hw) != 0)
@@ -305,6 +306,8 @@ vmwgfx_saa_dma(struct vmwgfx_saa *vsaa,
 			     (int) to_hw,
 			     (struct xa_box *) REGION_RECTS(reg),
 			     REGION_NUM_RECTS(reg));
+	if (to_hw)
+	    xa_context_flush(vsaa->xa_ctx);
 	if (vpix->gmr)
 	    vmwgfx_dmabuf_unmap(vpix->gmr);
 	if (ret)
@@ -441,7 +444,7 @@ vmwgfx_hw_kill(struct vmwgfx_saa *vsaa,
 				 &spix->dirty_hw))
 	return FALSE;
 
-    xa_surface_destroy(vpix->hw);
+    xa_surface_unref(vpix->hw);
     vpix->hw = NULL;
 
     /*
@@ -683,7 +686,8 @@ vmwgfx_present_prepare(struct vmwgfx_saa *vsaa,
 
     (void) pScreen;
     if (src_vpix == dst_vpix || !src_vpix->hw ||
-	xa_surface_handle(src_vpix->hw, &vsaa->src_handle, &dummy) != 0)
+	xa_surface_handle(src_vpix->hw, xa_handle_type_shared,
+		&vsaa->src_handle, &dummy) != 0)
 	return FALSE;
 
     REGION_NULL(pScreen, &vsaa->present_region);
@@ -784,7 +788,7 @@ vmwgfx_create_hw(struct vmwgfx_saa *vsaa,
     return TRUE;
 
 out_no_damage:
-    xa_surface_destroy(hw);
+    xa_surface_unref(hw);
     return FALSE;
 }
 
@@ -929,6 +933,7 @@ vmwgfx_copy_prepare(struct saa_driver *driver,
 
 	if (!vmwgfx_hw_validate(src_pixmap, src_reg)) {
 	    xa_copy_done(vsaa->xa_ctx);
+	    xa_context_flush(vsaa->xa_ctx);
 	    return FALSE;
 	}
 
@@ -1029,6 +1034,7 @@ vmwgfx_copy_done(struct saa_driver *driver)
 	return;
     }
     xa_copy_done(vsaa->xa_ctx);
+    xa_context_flush(vsaa->xa_ctx);
 }
 
 static Bool
@@ -1175,6 +1181,7 @@ vmwgfx_composite_done(struct saa_driver *driver)
    struct vmwgfx_saa *vsaa = to_vmwgfx_saa(driver);
 
    xa_composite_done(vsaa->xa_ctx);
+   xa_context_flush(vsaa->xa_ctx);
 }
 
 static void
@@ -1436,7 +1443,8 @@ vmwgfx_scanout_ref(struct vmwgfx_screen_entry  *entry)
 	     */
 	    if (!vmwgfx_hw_accel_validate(pixmap, 0, XA_FLAG_SCANOUT, 0, NULL))
 		goto out_err;
-	    if (xa_surface_handle(vpix->hw, &handle, &dummy) != 0)
+	    if (xa_surface_handle(vpix->hw, xa_handle_type_shared,
+			 &handle, &dummy) != 0)
 		goto out_err;
 	    depth = xa_format_depth(xa_surface_format(vpix->hw));
 

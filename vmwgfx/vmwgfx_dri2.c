@@ -201,7 +201,8 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
     }
 
     private->srf = srf;
-    if (xa_surface_handle(srf, &buffer->name, &buffer->pitch) != 0)
+    if (xa_surface_handle(srf, xa_handle_type_shared,
+	    &buffer->name, &buffer->pitch) != 0)
 	return FALSE;
 
     buffer->cpp = xa_format_depth(xa_surface_format(srf)) / 8;
@@ -222,7 +223,7 @@ dri2_do_destroy_buffer(DrawablePtr pDraw, DRI2BufferPtr buffer)
     struct vmwgfx_saa_pixmap *vpix = vmwgfx_saa_pixmap(private->pPixmap);
 
     if (--private->refcount == 0 && srf) {
-	xa_surface_destroy(srf);
+	xa_surface_unref(srf);
     }
 
     /*

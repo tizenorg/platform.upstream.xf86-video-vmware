@@ -118,7 +118,7 @@ if test x$BUILD_VMWGFX = xyes; then
 	PKG_CHECK_MODULES([LIBDRM], [libdrm],[],[BUILD_VMWGFX=no])
 fi
 if test x$BUILD_VMWGFX = xyes; then
-	PKG_CHECK_MODULES([XATRACKER], [xatracker >= 0.4.0],[],[BUILD_VMWGFX=no])
+	PKG_CHECK_MODULES([XATRACKER], [xatracker >= 2.0.0],[],[BUILD_VMWGFX=no])
 fi
 
 DRIVER_NAME=vmware
