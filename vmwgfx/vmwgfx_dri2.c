@@ -138,6 +138,8 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
       return TRUE;
     case DRI2BufferStencil:
     case DRI2BufferDepthStencil:
+	if (!pScrn->vtSema)
+	    return FALSE;
 
 	depth = (format) ? vmwgfx_zs_format_to_depth(format) : 32;
 
@@ -155,6 +157,9 @@ dri2_do_create_buffer(DrawablePtr pDraw, DRI2Buffer2Ptr buffer, unsigned int for
 
        break;
     case DRI2BufferDepth:
+	if (!pScrn->vtSema)
+	    return FALSE;
+
 	depth = (format) ? vmwgfx_z_format_to_depth(format) :
 	    pDraw->bitsPerPixel;
 
@@ -291,6 +296,14 @@ dri2_copy_region(DrawablePtr pDraw, RegionPtr pRegion,
     DrawablePtr dst_draw;
     RegionPtr myClip;
     GCPtr gc;
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);
+
+    /*
+     * This is a fragile protection against HW operations when not master.
+     * Needs to be blocked higher up in the dri2 code.
+     */
+    if (!pScrn->vtSema)
+	return;
 
     /*
      * In driCreateBuffers we dewrap windows into the

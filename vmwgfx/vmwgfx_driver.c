@@ -1116,6 +1116,7 @@ drv_leave_vt(VT_FUNC_ARGS_DECL)
 
     vmwgfx_cursor_bypass(ms->fd, 0, 0);
     vmwgfx_disable_scanout(pScrn);
+    vmwgfx_saa_drop_master(pScrn->pScreen);
 
     if (drmDropMaster(ms->fd))
 	xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
@@ -1135,6 +1136,8 @@ drv_enter_vt(VT_FUNC_ARGS_DECL)
 
     if (!drv_set_master(pScrn))
 	return FALSE;
+
+    vmwgfx_saa_set_master(pScrn->pScreen);
 
     if (!xf86SetDesiredModes(pScrn))
 	return FALSE;

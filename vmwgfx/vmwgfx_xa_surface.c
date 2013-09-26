@@ -362,6 +362,12 @@ vmwgfx_hw_accel_validate(PixmapPtr pixmap, unsigned int depth,
 Bool
 vmwgfx_hw_dri2_validate(PixmapPtr pixmap, unsigned int depth)
 {
+    struct vmwgfx_saa *vsaa =
+	to_vmwgfx_saa(saa_get_driver(pixmap->drawable.pScreen));
+
+    if (!vsaa->is_master)
+	    return FALSE;
+
     return (vmwgfx_hw_dri2_stage(pixmap, depth) &&
 	    vmwgfx_hw_commit(pixmap) &&
 	    vmwgfx_hw_validate(pixmap, NULL));

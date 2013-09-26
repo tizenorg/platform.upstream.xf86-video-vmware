@@ -54,6 +54,7 @@ struct vmwgfx_saa_pixmap {
     int hw_is_dri2_fronts;
     struct _WsbmListHead sync_x_head;
     struct _WsbmListHead scanout_list;
+    struct _WsbmListHead pixmap_list;
 
     uint32_t xa_flags;
     uint32_t staging_add_flags;
@@ -107,4 +108,11 @@ Bool
 vmwgfx_hw_accel_validate(PixmapPtr pixmap, unsigned int depth,
 			 uint32_t add_flags, uint32_t remove_flags,
 			 RegionPtr region);
+
+void
+vmwgfx_saa_set_master(ScreenPtr pScreen);
+
+void
+vmwgfx_saa_drop_master(ScreenPtr pScreen);
+
 #endif

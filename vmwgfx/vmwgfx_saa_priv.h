@@ -54,8 +54,10 @@ struct vmwgfx_saa {
     Bool use_present_opt;
     Bool only_hw_presents;
     Bool rendercheck;
+    Bool is_master;
     void (*present_flush) (ScreenPtr pScreen);
     struct _WsbmListHead sync_x_list;
+    struct _WsbmListHead pixmaps;
     struct vmwgfx_composite *vcomp;
 };
 
