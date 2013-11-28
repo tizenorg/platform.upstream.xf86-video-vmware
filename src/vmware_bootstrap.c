@@ -256,7 +256,6 @@ VMwarePciProbe (DriverPtr           drv,
                 intptr_t            match_data)
 {
     ScrnInfoPtr     scrn = NULL;
-    EntityInfoPtr   entity;
 
     scrn = xf86ConfigPciEntity(scrn, 0, entity_num, VMWAREPciChipsets,
                                NULL, NULL, NULL, NULL, NULL);
@@ -267,7 +266,6 @@ VMwarePciProbe (DriverPtr           drv,
         scrn->Probe = NULL;
     }
 
-    entity = xf86GetEntityInfo(entity_num);
     switch (DEVICE_ID(device)) {
     case PCI_DEVICE_ID_VMWARE_SVGA2:
     case PCI_DEVICE_ID_VMWARE_SVGA:

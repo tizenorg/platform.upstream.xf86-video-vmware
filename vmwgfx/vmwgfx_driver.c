@@ -658,7 +658,6 @@ void xorg_flush(ScreenPtr pScreen)
 	if (crtc->enabled) {
 	    pixmap = crtc_get_scanout(crtc);
 	    if (pixmap) {
-		unsigned int j;
 
 		/*
 		 * Remove duplicates.

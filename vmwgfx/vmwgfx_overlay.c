@@ -84,7 +84,7 @@ typedef uint8_t uint8;
 #define VMWARE_VID_MAX_HEIGHT   2048
 
 #define VMWARE_VID_NUM_ENCODINGS 1
-static XF86VideoEncodingRec vmwareVideoEncodings[] =
+static const XF86VideoEncodingRec vmwareVideoEncodings[] =
 {
     {
        0,
@@ -110,7 +110,7 @@ static XF86ImageRec vmwareVideoImages[] =
 };
 
 #define VMWARE_VID_NUM_ATTRIBUTES 2
-static XF86AttributeRec vmwareVideoAttributes[] =
+static const XF86AttributeRec vmwareVideoAttributes[] =
 {
     {
         XvGettable | XvSettable,

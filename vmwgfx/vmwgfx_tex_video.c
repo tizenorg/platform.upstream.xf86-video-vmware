@@ -70,11 +70,11 @@ static const float bt_709[] = {
 static Atom xvBrightness, xvContrast, xvSaturation, xvHue;
 
 #define NUM_TEXTURED_ATTRIBUTES 4
-static XF86AttributeRec TexturedAttributes[NUM_TEXTURED_ATTRIBUTES] = {
-   {XvSettable | XvGettable, -1000, 1000, "XV_BRIGHTNESS"},
-   {XvSettable | XvGettable, -1000, 1000, "XV_CONTRAST"},
-   {XvSettable | XvGettable, -1000, 1000, "XV_SATURATION"},
-   {XvSettable | XvGettable, -1000, 1000, "XV_HUE"}
+static const XF86AttributeRec TexturedAttributes[NUM_TEXTURED_ATTRIBUTES] = {
+    {XvSettable | XvGettable, -1000, 1000, "XV_BRIGHTNESS"},
+    {XvSettable | XvGettable, -1000, 1000, "XV_CONTRAST"},
+    {XvSettable | XvGettable, -1000, 1000, "XV_SATURATION"},
+    {XvSettable | XvGettable, -1000, 1000, "XV_HUE"}
 };
 
 #define NUM_FORMATS 3
@@ -82,7 +82,7 @@ static XF86VideoFormatRec Formats[NUM_FORMATS] = {
    {15, TrueColor}, {16, TrueColor}, {24, TrueColor}
 };
 
-static XF86VideoEncodingRec DummyEncoding[1] = {
+static const XF86VideoEncodingRec DummyEncoding[1] = {
    {
       0,
       "XV_IMAGE",
@@ -416,16 +416,16 @@ copy_packed_data(ScrnInfoPtr pScrn,
    switch (id) {
    case FOURCC_YV12: {
       int pitches[3], offsets[3];
-      unsigned char *y, *u, *v;
+      unsigned char *yp, *up, *vp;
       query_image_attributes(pScrn, FOURCC_YV12,
                              &w, &h, pitches, offsets);
 
-      y = buf + offsets[0];
-      v = buf + offsets[1];
-      u = buf + offsets[2];
-      memcpy(ymap, y, w*h);
-      memcpy(vmap, v, w*h/4);
-      memcpy(umap, u, w*h/4);
+      yp = buf + offsets[0];
+      vp = buf + offsets[1];
+      up = buf + offsets[2];
+      memcpy(ymap, yp, w*h);
+      memcpy(vmap, vp, w*h/4);
+      memcpy(umap, up, w*h/4);
       break;
    }
    case FOURCC_UYVY:
