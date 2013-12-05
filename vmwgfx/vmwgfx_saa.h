@@ -115,4 +115,16 @@ vmwgfx_saa_set_master(ScreenPtr pScreen);
 void
 vmwgfx_saa_drop_master(ScreenPtr pScreen);
 
+#if (XA_TRACKER_VERSION_MAJOR <= 1) && !defined(HAVE_XA_2)
+
+#define _xa_surface_handle(_a, _b, _c) xa_surface_handle(_a, _b, _c)
+#define xa_context_flush(_a)
+
+#else
+
+#define xa_surface_destroy(_a) xa_surface_unref(_a)
+#define _xa_surface_handle(_a, _b, _c)		\
+    xa_surface_handle(_a, xa_handle_type_shared, _b, _c)
+
+#endif /*  (XA_TRACKER_VERSION_MAJOR <= 1) */
 #endif

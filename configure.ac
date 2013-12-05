@@ -118,7 +118,15 @@ if test x$BUILD_VMWGFX = xyes; then
 	PKG_CHECK_MODULES([LIBDRM], [libdrm],[],[BUILD_VMWGFX=no])
 fi
 if test x$BUILD_VMWGFX = xyes; then
-	PKG_CHECK_MODULES([XATRACKER], [xatracker >= 2.0.0],[],[BUILD_VMWGFX=no])
+#
+# Early versions of mesa 10 forgot to bump the XA major version number in
+# the xa_tracker.h header
+#
+	PKG_CHECK_MODULES([XATRACKER], [xatracker >= 0.4.0],
+			  [PKG_CHECK_EXISTS([xatracker = 2.0.0],
+	                  [AC_DEFINE([HAVE_XA_2], 1,
+               		  [Has version 2 of XA])])],
+			  [],[BUILD_VMWGFX=no])
 fi
 
 DRIVER_NAME=vmware

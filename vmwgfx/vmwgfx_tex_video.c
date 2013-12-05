@@ -199,7 +199,7 @@ stop_video(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
        for (i=0; i<3; ++i) {
 	   for (j=0; j<2; ++j) {
 	       if (priv->yuv[i]) {
-		   xa_surface_unref(priv->yuv[j][i]);
+		   xa_surface_destroy(priv->yuv[j][i]);
 		   priv->yuv[j][i] = NULL;
 	       }
 	   }

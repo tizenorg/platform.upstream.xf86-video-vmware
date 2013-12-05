@@ -146,7 +146,7 @@ vmwgfx_pixmap_free_storage(struct vmwgfx_saa_pixmap *vpix)
 	vpix->malloc = NULL;
     }
     if (!(vpix->backing & VMWGFX_PIX_SURFACE) && vpix->hw) {
-	xa_surface_unref(vpix->hw);
+	xa_surface_destroy(vpix->hw);
 	vpix->hw = NULL;
     }
     if (!(vpix->backing & VMWGFX_PIX_GMR) && vpix->gmr) {
@@ -451,7 +451,7 @@ vmwgfx_hw_kill(struct vmwgfx_saa *vsaa,
 				 &spix->dirty_hw))
 	return FALSE;
 
-    xa_surface_unref(vpix->hw);
+    xa_surface_destroy(vpix->hw);
     vpix->hw = NULL;
 
     /*
@@ -698,8 +698,7 @@ vmwgfx_present_prepare(struct vmwgfx_saa *vsaa,
 
     (void) pScreen;
     if (src_vpix == dst_vpix || !src_vpix->hw ||
-	xa_surface_handle(src_vpix->hw, xa_handle_type_shared,
-		&vsaa->src_handle, &dummy) != 0)
+	_xa_surface_handle(src_vpix->hw, &vsaa->src_handle, &dummy) != 0)
 	return FALSE;
 
     REGION_NULL(pScreen, &vsaa->present_region);
@@ -800,7 +799,7 @@ vmwgfx_create_hw(struct vmwgfx_saa *vsaa,
     return TRUE;
 
 out_no_damage:
-    xa_surface_unref(hw);
+    xa_surface_destroy(hw);
     return FALSE;
 }
 
@@ -1459,8 +1458,7 @@ vmwgfx_scanout_ref(struct vmwgfx_screen_entry  *entry)
 	     */
 	    if (!vmwgfx_hw_accel_validate(pixmap, 0, XA_FLAG_SCANOUT, 0, NULL))
 		goto out_err;
-	    if (xa_surface_handle(vpix->hw, xa_handle_type_shared,
-			 &handle, &dummy) != 0)
+	    if (_xa_surface_handle(vpix->hw, &handle, &dummy) != 0)
 		goto out_err;
 	    depth = xa_format_depth(xa_surface_format(vpix->hw));
 

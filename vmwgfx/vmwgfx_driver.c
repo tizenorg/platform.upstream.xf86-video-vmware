@@ -617,8 +617,7 @@ vmwgfx_scanout_present(ScreenPtr pScreen, int drm_fd,
 	return FALSE;
     }
 
-    if (xa_surface_handle(vpix->hw, xa_handle_type_shared,
-	    &handle, &dummy) != 0) {
+    if (_xa_surface_handle(vpix->hw, &handle, &dummy) != 0) {
 	LogMessage(X_ERROR, "Could not get present surface handle.\n");
 	return FALSE;
     }
