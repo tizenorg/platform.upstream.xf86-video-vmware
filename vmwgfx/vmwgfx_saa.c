@@ -1230,7 +1230,7 @@ vmwgfx_operation_complete(struct saa_driver *driver,
      */
 
     if (vpix->hw && vpix->hw_is_dri2_fronts) {
-	if (1 && pScrn->vtSema &&
+	if (pScrn->vtSema &&
 	    vmwgfx_upload_to_hw(driver, pixmap, &spix->dirty_shadow)) {
 
 	    REGION_EMPTY(vsaa->pScreen, &spix->dirty_shadow);
