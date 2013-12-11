@@ -50,6 +50,7 @@ struct vmwgfx_saa {
     int ydiff;
     RegionRec present_region;
     uint32_t src_handle;
+    Bool can_optimize_dma;
     Bool use_present_opt;
     Bool only_hw_presents;
     Bool rendercheck;
