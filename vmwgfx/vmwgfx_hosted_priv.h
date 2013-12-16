@@ -34,4 +34,7 @@
 extern const struct vmwgfx_hosted_driver *vmwgfx_xmir_detect(void);
 extern void vmwgfx_xmir_modify_flags(uint32_t *flags);
 
+extern const struct vmwgfx_hosted_driver *vmwgfx_xwl_detect(void);
+extern void vmwgfx_xwl_modify_flags(uint32_t *flags);
+
 #endif
