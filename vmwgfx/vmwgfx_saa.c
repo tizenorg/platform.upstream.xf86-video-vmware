@@ -292,8 +292,7 @@ vmwgfx_saa_dma(struct vmwgfx_saa *vsaa,
     if (vpix->gmr && vsaa->can_optimize_dma) {
 	uint32_t handle, dummy;
 
-	if (xa_surface_handle(vpix->hw, xa_handle_type_shared,
-		 &handle, &dummy) != 0)
+	if (_xa_surface_handle(vpix->hw, &handle, &dummy) != 0)
 	    goto out_err;
 	if (vmwgfx_dma(0, 0, reg, vpix->gmr, pixmap->devKind, handle,
 		       to_hw) != 0)
