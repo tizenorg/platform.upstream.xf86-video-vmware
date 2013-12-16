@@ -23,6 +23,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  * Author: Thomas Hellstrom <thellstrom@vmware.com>
+ * Note: "Hosted" is a term stolen from the xf86-video-intel driver.
  */
 
 #ifndef _VMWGFX_HOSTED_H

@@ -46,7 +46,9 @@
 const struct vmwgfx_hosted_driver *
 vmwgfx_hosted_detect(void)
 {
-    return NULL;
+    const struct vmwgfx_hosted_driver *tmp = vmwgfx_xmir_detect();
+
+    return tmp;
 }
 
 /**
@@ -61,4 +63,5 @@ vmwgfx_hosted_detect(void)
 void
 vmwgfx_hosted_modify_flags(uint32_t *flags)
 {
+    vmwgfx_xmir_modify_flags(flags);
 }

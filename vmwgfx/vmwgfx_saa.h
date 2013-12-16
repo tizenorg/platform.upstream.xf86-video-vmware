@@ -52,6 +52,7 @@ struct vmwgfx_saa_pixmap {
     struct xa_surface *hw;
     uint32_t fb_id;
     int hw_is_dri2_fronts;
+    Bool hw_is_hosted;
     struct _WsbmListHead sync_x_head;
     struct _WsbmListHead scanout_list;
     struct _WsbmListHead pixmap_list;
@@ -114,6 +115,10 @@ vmwgfx_saa_set_master(ScreenPtr pScreen);
 
 void
 vmwgfx_saa_drop_master(ScreenPtr pScreen);
+
+Bool
+vmwgfx_saa_copy_to_surface(DrawablePtr pDraw, uint32_t surface_fd,
+			   const BoxRec *dst_box, RegionPtr region);
 
 #if (XA_TRACKER_VERSION_MAJOR <= 1) && !defined(HAVE_XA_2)
 

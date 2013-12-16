@@ -31,4 +31,7 @@
 #include <stdint.h>
 #include "vmwgfx_hosted.h"
 
+extern const struct vmwgfx_hosted_driver *vmwgfx_xmir_detect(void);
+extern void vmwgfx_xmir_modify_flags(uint32_t *flags);
+
 #endif
