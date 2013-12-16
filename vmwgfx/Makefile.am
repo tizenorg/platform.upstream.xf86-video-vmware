@@ -25,5 +25,8 @@ libvmwgfx_la_SOURCES = \
 	vmwgfx_ctrl.h \
 	vmwgfx_xa_composite.c \
 	vmwgfx_xa_surface.c \
+	vmwgfx_hosted.c \
+	vmwgfx_hosted.h \
+	vmwgfx_hosted_priv.h \
 	wsbm_util.h
 endif

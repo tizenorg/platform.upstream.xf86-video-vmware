@@ -43,6 +43,7 @@
 #include "vmwgfx_saa.h"
 #include "wsbm_util.h"
 #include <unistd.h>
+#include "vmwgfx_hosted.h"
 
 #define VMWGFX_FD_PATH_LEN 80
 
@@ -381,6 +382,27 @@ dri2_copy_region(DrawablePtr pDraw, RegionPtr pRegion,
     FreeScratchGC(gc);
 }
 
+#if (DRI2INFOREC_VERSION >= 8 && DRI2INFOREC_VERSION < 10)
+static int vmw_dri_auth_magic2(ScreenPtr pScreen, uint32_t magic)
+{
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);
+    modesettingPtr ms = modesettingPTR(pScrn);
+
+    return vmwgfx_hosted_dri_auth(ms->hdriver, ms->hosted, NULL, magic);
+}
+#endif
+
+#if (DRI2INFOREC_VERSION >= 10)
+static int vmw_dri_auth_magic3(ClientPtr client, ScreenPtr pScreen,
+			       uint32_t magic)
+{
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);
+    modesettingPtr ms = modesettingPTR(pScrn);
+
+    return vmwgfx_hosted_dri_auth(ms->hdriver, ms->hosted, client, magic);
+}
+#endif
+
 Bool
 xorg_dri2_init(ScreenPtr pScreen)
 {
@@ -390,6 +412,8 @@ xorg_dri2_init(ScreenPtr pScreen)
     int major, minor;
     char fdPath[VMWGFX_FD_PATH_LEN];
     ssize_t numChar;
+
+    memset(&dri2info, 0, sizeof(dri2info));
 
     if (xf86LoaderCheckSymbol("DRI2Version")) {
 	DRI2Version(&major, &minor);
@@ -426,6 +450,19 @@ xorg_dri2_init(ScreenPtr pScreen)
 
     dri2info.CopyRegion = dri2_copy_region;
     dri2info.Wait = NULL;
+
+#if (DRI2INFOREC_VERSION >= 8 && DRI2INFOREC_VERSION < 10)
+    if (vmwgfx_is_hosted(ms->hdriver)) {
+	dri2info.version = 8;
+	dri2info.AuthMagic2 = vmw_dri_auth_magic2;
+    }
+#endif
+#if (DRI2INFOREC_VERSION >= 10)
+    if (vmwgfx_is_hosted(ms->hdriver)) {
+	dri2info.version = 10;
+	dri2info.AuthMagic3 = vmw_dri_auth_magic3;
+    }
+#endif
 
     return DRI2ScreenInit(pScreen, &dri2info);
 }
