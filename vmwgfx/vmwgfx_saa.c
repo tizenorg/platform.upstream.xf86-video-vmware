@@ -1423,7 +1423,7 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
 	vsaa->xa_ctx = xa_context_default(xat);
     vsaa->drm_fd = drm_fd;
     vsaa->present_flush = present_flush;
-    vsaa->can_optimize_dma = FALSE;
+    vsaa->can_optimize_dma = TRUE;
     vsaa->use_present_opt = direct_presents;
     vsaa->only_hw_presents = only_hw_presents;
     vsaa->rendercheck = rendercheck;
