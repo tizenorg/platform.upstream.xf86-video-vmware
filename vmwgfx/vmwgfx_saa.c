@@ -1428,6 +1428,7 @@ vmwgfx_saa_init(ScreenPtr pScreen, int drm_fd, struct xa_tracker *xat,
     vsaa->only_hw_presents = only_hw_presents;
     vsaa->rendercheck = rendercheck;
     vsaa->is_master = TRUE;
+    vsaa->known_prime_format = FALSE;
     WSBMINITLISTHEAD(&vsaa->sync_x_list);
     WSBMINITLISTHEAD(&vsaa->pixmaps);
 
@@ -1688,23 +1689,24 @@ vmwgfx_saa_copy_to_surface(DrawablePtr pDraw, uint32_t surface_fd,
 
     /*
      * Determine the intersection between software contents and region to copy.
-     * XXX: First check that the software contents is compatible with the
-     * external surface format, before applying this optimization.
      */
-    REGION_NULL(pScreen, &intersection);
-    if (!vpix->hw)
-	REGION_COPY(pScreen, &intersection, region);
-    else if (spix->damage && REGION_NOTEMPTY(pScreen, &spix->dirty_shadow))
-	REGION_INTERSECT(pScreen, &intersection, region, &spix->dirty_shadow);
 
-    /*
-     * DMA software contents directly into the destination. Then subtract
-     * the region we've DMA'd from the region to copy.
-     */
-    if (REGION_NOTEMPTY(pScreen, &intersection)) {
-	if (vmwgfx_saa_dma(vsaa, src, &intersection, TRUE, dx, dy, dst)) {
-	    REGION_SUBTRACT(pScreen, &intersection, region, &intersection);
-	    copy_region = &intersection;
+    if (vsaa->known_prime_format) {
+	REGION_NULL(pScreen, &intersection);
+	if (!vpix->hw)
+	    REGION_COPY(pScreen, &intersection, region);
+	else if (spix->damage && REGION_NOTEMPTY(pScreen, &spix->dirty_shadow))
+	    REGION_INTERSECT(pScreen, &intersection, region, &spix->dirty_shadow);
+
+	/*
+	 * DMA software contents directly into the destination. Then subtract
+	 * the region we've DMA'd from the region to copy.
+	 */
+	if (REGION_NOTEMPTY(pScreen, &intersection)) {
+	    if (vmwgfx_saa_dma(vsaa, src, &intersection, TRUE, dx, dy, dst)) {
+		REGION_SUBTRACT(pScreen, &intersection, region, &intersection);
+		copy_region = &intersection;
+	    }
 	}
     }
 
@@ -1716,6 +1718,11 @@ vmwgfx_saa_copy_to_surface(DrawablePtr pDraw, uint32_t surface_fd,
      */
     box = REGION_RECTS(copy_region);
     n = REGION_NUM_RECTS(copy_region);
+
+    if (!vmwgfx_hw_accel_validate(src, 0, 0, 0, copy_region)) {
+	ret = FALSE;
+	goto out_no_copy;
+    }
 
     if (xa_copy_prepare(vsaa->xa_ctx, dst, vpix->hw) != XA_ERR_NONE) {
 	ret = FALSE;
@@ -1732,7 +1739,8 @@ vmwgfx_saa_copy_to_surface(DrawablePtr pDraw, uint32_t surface_fd,
     xa_context_flush(vsaa->xa_ctx);
 
   out_no_copy:
-    REGION_UNINIT(pScreen, &intersection);
+    if (vsaa->known_prime_format)
+	REGION_UNINIT(pScreen, &intersection);
     if (sx || sy)
 	REGION_TRANSLATE(pScreen, region, -sx, -sy);
     xa_surface_unref(dst);
