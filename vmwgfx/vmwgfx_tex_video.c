@@ -82,7 +82,7 @@ static XF86VideoFormatRec Formats[NUM_FORMATS] = {
    {15, TrueColor}, {16, TrueColor}, {24, TrueColor}
 };
 
-static const XF86VideoEncodingRec DummyEncoding[1] = {
+static XF86VideoEncodingRec DummyEncoding[1] = {
    {
       0,
       "XV_IMAGE",

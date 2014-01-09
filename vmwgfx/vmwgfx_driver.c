@@ -130,7 +130,7 @@ vmwgfx_hookup(ScrnInfoPtr pScrn)
 }
 
 void
-vmwgfx_modify_flags(CARD32 *flags)
+vmwgfx_modify_flags(uint32_t *flags)
 {
     *flags &= ~(HW_IO);
     vmwgfx_hosted_modify_flags(flags);

@@ -34,6 +34,7 @@
 #include "xf86Pci.h"		/* pci */
 #include "vm_device_version.h"
 #include "vmware_bootstrap.h"
+#include <stdint.h>
 
 #if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 6
 #include "xf86Resources.h"
