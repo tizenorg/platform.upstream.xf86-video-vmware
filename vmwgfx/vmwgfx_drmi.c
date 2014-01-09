@@ -501,6 +501,7 @@ vmwgfx_max_fb_size(int drm_fd, size_t *size)
     return 0;
 }
 
+#ifdef HAVE_LIBDRM_2_4_38
 /**
  * vmwgfx_prime_fd_to_handle - Return a TTM handle to a prime object
  *
@@ -537,3 +538,4 @@ vmwgfx_prime_release_handle(int drm_fd, uint32_t handle)
     (void) drmCommandWrite(drm_fd, DRM_VMW_UNREF_SURFACE, &s_arg,
 			   sizeof(s_arg));
 }
+#endif /* HAVE_LIBDRM_2_4_38 */

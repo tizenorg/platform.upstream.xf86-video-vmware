@@ -116,9 +116,11 @@ vmwgfx_saa_set_master(ScreenPtr pScreen);
 void
 vmwgfx_saa_drop_master(ScreenPtr pScreen);
 
+#if (XA_TRACKER_VERSION_MAJOR >= 2) && defined(HAVE_LIBDRM_2_4_38)
 Bool
 vmwgfx_saa_copy_to_surface(DrawablePtr pDraw, uint32_t surface_fd,
 			   const BoxRec *dst_box, RegionPtr region);
+#endif /* (XA_TRACKER_VERSION_MAJOR >= 2) && defined(HAVE_LIBDRM_2_4_38) */
 
 #if (XA_TRACKER_VERSION_MAJOR <= 1) && !defined(HAVE_XA_2)
 

@@ -32,7 +32,7 @@
 #include "vmwgfx_hosted_priv.h"
 #include <xa_tracker.h>
 
-#if XMIR && (XA_TRACKER_VERSION_MAJOR >= 2)
+#if XMIR && (XA_TRACKER_VERSION_MAJOR >= 2) && defined(HAVE_LIBDRM_2_4_38)
 
 #include "vmwgfx_hosted.h"
 #include "vmwgfx_saa.h"

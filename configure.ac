@@ -127,6 +127,12 @@ if test x$BUILD_VMWGFX = xyes; then
 	                  [AC_DEFINE([HAVE_XA_2], 1,
                		  [Has version 2 of XA])])],
 			  [],[BUILD_VMWGFX=no])
+#
+# Check for prime.
+#
+	PKG_CHECK_EXISTS([libdrm >= 2.4.38],
+			 [AC_DEFINE([HAVE_LIBDRM_2_4_38], 1,
+			 [Has version 2.4.38 or greater of libdrm])])
 fi
 
 DRIVER_NAME=vmware

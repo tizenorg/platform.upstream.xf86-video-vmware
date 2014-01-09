@@ -1618,7 +1618,7 @@ vmwgfx_saa_drop_master(ScreenPtr pScreen)
  * Helpers for hosted.
  */
 
-#if (XA_TRACKER_VERSION_MAJOR >= 2)
+#if (XA_TRACKER_VERSION_MAJOR >= 2) && defined(HAVE_LIBDRM_2_4_38)
 
 /**
  * vmwgfx_saa_copy_to_surface - Copy Drawable contents to an external surface.

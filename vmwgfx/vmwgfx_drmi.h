@@ -85,9 +85,11 @@ vmwgfx_update_gui_layout(int drm_fd, unsigned int num_rects,
 int
 vmwgfx_get_param(int drm_fd, uint32_t param, uint64_t *out);
 
+#ifdef HAVE_LIBDRM_2_4_38
 int
 vmwgfx_prime_fd_to_handle(int drm_fd, int prime_fd, uint32_t *handle);
 
 void
 vmwgfx_prime_release_handle(int drm_fd, uint32_t handle);
+#endif /* HAVE_LIBDRM_2_4_38 */
 #endif
