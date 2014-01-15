@@ -318,7 +318,7 @@ vmwgfx_hw_commit(PixmapPtr pixmap)
 	uint32_t new_flags;
 
 	new_flags = (vpix->xa_flags & ~vpix->staging_remove_flags) |
-	    vpix->staging_add_flags;
+	    vpix->staging_add_flags | XA_FLAG_SHARED;
 
 	if (vpix->staging_format != xa_surface_format(vpix->hw))
 	    LogMessage(X_INFO, "Changing hardware format.\n");

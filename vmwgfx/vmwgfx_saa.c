@@ -811,7 +811,7 @@ vmwgfx_create_hw(struct vmwgfx_saa *vsaa,
 	return TRUE;
 
     new_flags = (vpix->xa_flags & ~vpix->staging_remove_flags) |
-	vpix->staging_add_flags;
+	vpix->staging_add_flags | XA_FLAG_SHARED;
 
     hw = xa_surface_create(vsaa->xat,
 			   pixmap->drawable.width,
