@@ -1,3 +1,5 @@
+%bcond_with x
+
 Name:           xf86-video-vmware
 Version:        12.0.2
 Release:        0
@@ -21,7 +23,13 @@ BuildRequires:  pkgconfig(xineramaproto)
 BuildRequires:  pkgconfig(xorg-macros) >= 1.8
 BuildRequires:  pkgconfig(xorg-server) >= 1.0.1
 BuildRequires:  pkgconfig(xproto)
+
+%if %{with x}
 ExclusiveArch:  %ix86 x86_64
+%else
+ExclusiveArch:
+%endif
+
 
 %description
 vmware is an Xorg driver for VMware virtual video cards.
