@@ -1,14 +1,14 @@
 %bcond_with x
 
 Name:           xf86-video-vmware
-Version:        12.0.2
+Version:        13.0.2
 Release:        0
 License:        MIT
 Summary:        VMware SVGA video driver for the Xorg X server
 Url:            http://xorg.freedesktop.org/
-Group:          System/X11/Servers/XF86_4
+Group:          Graphics & UI Framework/Hardware Adaptation
 #Source0:       http://xorg.freedesktop.org/releases/individual/driver/%{name}-%{version}.tar.bz2
-Source0:        %{name}-%{version}_007bed3.tar.bz2
+Source0:        %{name}-%{version}.tar.bz2
 Source1001: 	xf86-video-vmware.manifest
 BuildRequires:  pkg-config
 BuildRequires:  pkgconfig(fontsproto)
@@ -39,6 +39,7 @@ vmware is an Xorg driver for VMware virtual video cards.
 cp %{SOURCE1001} .
 
 %build
+%autogen
 %configure
 make %{?_smp_mflags}
 
@@ -48,7 +49,7 @@ make %{?_smp_mflags}
 %files
 %manifest %{name}.manifest
 %defattr(-,root,root)
-%doc COPYING
+%license COPYING
 %dir %{_libdir}/xorg/modules/drivers
 %{_libdir}/xorg/modules/drivers/vmware_drv.so
 %{_mandir}/man4/vmware.4%{?ext_man}
